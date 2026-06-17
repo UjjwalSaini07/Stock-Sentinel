@@ -399,6 +399,211 @@ function PortfolioRangePredictor({ totalValue, performance }: { totalValue: numb
   )
 }
 
+function SharpeOptimizerCard({ 
+  portfolio, 
+  performance, 
+  totalValue 
+}: { 
+  portfolio: PortfolioEntry[]
+  performance: PortfolioPerformance | null
+  totalValue: number 
+}) {
+  const [cagr, setCagr] = useState<number>(12)
+
+  if (portfolio.length === 0) return null
+
+  const expectedReturn = cagr / 100
+  const riskFreeRate = 0.05
+  const vol = performance?.risk?.volatility ? performance.risk.volatility / 100 : 0.20
+  
+  // Sharpe Ratio calculation
+  const sharpe = vol > 0 ? (expectedReturn - riskFreeRate) / vol : 0
+
+  let rating = 'Sub-optimal'
+  let ratingColor = 'text-red-400 bg-red-500/10 border-red-500/15'
+  let advice = 'Sub-optimal risk efficiency. Consider trimming high-beta or overvalued assets to lower volatility.'
+  
+  if (sharpe >= 1.0) {
+    rating = 'Excellent'
+    ratingColor = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/15'
+    advice = 'Your portfolio is highly optimized for risk-adjusted returns. Maintain configuration.'
+  } else if (sharpe >= 0.5) {
+    rating = 'Good'
+    ratingColor = 'text-brand-400 bg-brand-500/10 border-brand-500/15'
+    advice = 'Reasonable risk-efficiency. You could optimize by increasing allocation in low-beta, high-ROE assets.'
+  }
+
+  // 1-Year Monte Carlo Projections
+  const pessimistic = totalValue * Math.exp((expectedReturn - 0.5 * vol * vol) - 1.28155 * vol)
+  const median = totalValue * Math.exp(expectedReturn - 0.5 * vol * vol)
+  const optimistic = totalValue * Math.exp((expectedReturn - 0.5 * vol * vol) + 1.28155 * vol)
+
+  const pessimisticChange = ((pessimistic - totalValue) / totalValue) * 100
+  const medianChange = ((median - totalValue) / totalValue) * 100
+  const optimisticChange = ((optimistic - totalValue) / totalValue) * 100
+
+  // Hold/Buy/Sell Decision Matrix
+  const decisions = portfolio.map(entry => {
+    const cp = entry.current_price ?? entry.buy_price
+    const weight = totalValue > 0 ? ((cp * entry.quantity) / totalValue) * 100 : 0
+    const pe = entry.stock_pe ?? null
+    const roe = entry.roe ?? null
+    const roce = entry.roce ?? null
+    const high = entry.high ?? null
+    const low = entry.low ?? null
+
+    const pricePct = (high && low && high > low) ? ((cp - low) / (high - low)) * 100 : null
+
+    let recommendation: 'Buy' | 'Hold' | 'Trim' = 'Hold'
+    let rationale = ''
+    let badgeColor = 'bg-gray-500/10 text-gray-400 border-gray-500/15'
+
+    if (weight > 30) {
+      recommendation = 'Trim'
+      rationale = `Trim: High concentration risk (${weight.toFixed(1)}%) in portfolio.`
+      badgeColor = 'bg-red-500/10 text-red-400 border-red-500/15'
+    } else if (pe && pe > 40 && pricePct && pricePct > 95) {
+      recommendation = 'Trim'
+      rationale = `Trim: Premium valuation (P/E ${pe}) & trading at 52w high (${pricePct.toFixed(0)}%).`
+      badgeColor = 'bg-red-500/10 text-red-400 border-red-500/15'
+    } else if (pe && pe < 15 && ((roe && roe > 15) || (roce && roce > 15))) {
+      recommendation = 'Buy'
+      rationale = `Buy: High capital return (ROE ${roe ?? roce}%) & undervalued (P/E ${pe}).`
+      badgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/15'
+    } else if (pricePct && pricePct < 10 && ((roe && roe > 12) || (roce && roce > 12))) {
+      recommendation = 'Buy'
+      rationale = `Buy: Quality company trading near 52w low (${pricePct.toFixed(0)}%).`
+      badgeColor = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/15'
+    } else {
+      recommendation = 'Hold'
+      rationale = 'Hold: Fair valuation and optimal position weight.'
+      badgeColor = 'bg-gray-500/10 text-gray-400 border-gray-500/15'
+    }
+
+    return {
+      ticker: entry.ticker,
+      weight,
+      recommendation,
+      rationale,
+      badgeColor
+    }
+  })
+
+  return (
+    <div className="card space-y-4 border-white/5 bg-white/[0.02] backdrop-blur-md relative overflow-hidden group">
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-brand-500/20 via-brand-500 to-brand-500/20" />
+      
+      <div className="flex justify-between items-start">
+        <div>
+          <h3 className="section-title text-brand-400 flex items-center gap-1.5">
+            <Activity size={14} /> Sharpe Optimizer & Path Forecaster
+          </h3>
+          <p className="text-xs text-gray-500 mt-0.5">Risk-adjusted returns simulation & holdings allocation matrix.</p>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {/* CAGR Slider */}
+        <div className="space-y-1.5">
+          <div className="flex justify-between text-xs font-semibold">
+            <span className="text-gray-400 font-medium">Expected CAGR:</span>
+            <span className="text-white font-mono font-bold">{cagr}%</span>
+          </div>
+          <input 
+            type="range" 
+            min={8} 
+            max={25} 
+            step={1} 
+            value={cagr}
+            onChange={(e) => setCagr(Number(e.target.value))}
+            className="w-full h-1 bg-white/5 rounded-lg appearance-none cursor-pointer accent-brand-500"
+          />
+        </div>
+
+        {/* Sharpe Efficiency Indicator */}
+        <div className="p-3 bg-white/[0.01] border border-white/5 rounded-xl space-y-2">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-gray-400">Sharpe Efficiency:</span>
+            <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${ratingColor}`}>
+              {rating} ({sharpe.toFixed(2)})
+            </span>
+          </div>
+          <p className="text-[11px] leading-normal text-gray-400">
+            {advice}
+          </p>
+        </div>
+
+        {/* 1-Year Monte Carlo Projections Grid */}
+        <div className="space-y-1.5">
+          <span className="text-[10px] text-gray-500 uppercase font-semibold tracking-wider">1-Year Monte Carlo Wealth Forecast</span>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="p-2 bg-white/[0.01] border border-white/5 rounded-xl text-center">
+              <span className="text-[9px] text-gray-500 font-semibold block uppercase">10th Percentile</span>
+              <span className="text-[11px] font-mono font-bold text-red-400 block mt-0.5">
+                ₹{Math.round(pessimistic).toLocaleString('en-IN')}
+              </span>
+              <span className="text-[9px] font-mono text-red-500/70">
+                {pessimisticChange >= 0 ? '+' : ''}{pessimisticChange.toFixed(1)}%
+              </span>
+            </div>
+
+            <div className="p-2 bg-white/[0.01] border border-white/5 rounded-xl text-center">
+              <span className="text-[9px] text-gray-500 font-semibold block uppercase">Median (50th)</span>
+              <span className="text-[11px] font-mono font-bold text-white block mt-0.5">
+                ₹{Math.round(median).toLocaleString('en-IN')}
+              </span>
+              <span className="text-[9px] font-mono text-gray-400">
+                {medianChange >= 0 ? '+' : ''}{medianChange.toFixed(1)}%
+              </span>
+            </div>
+
+            <div className="p-2 bg-white/[0.01] border border-white/5 rounded-xl text-center">
+              <span className="text-[9px] text-gray-500 font-semibold block uppercase">90th Percentile</span>
+              <span className="text-[11px] font-mono font-bold text-brand-400 block mt-0.5">
+                ₹{Math.round(optimistic).toLocaleString('en-IN')}
+              </span>
+              <span className="text-[9px] font-mono text-brand-500/70">
+                {optimisticChange >= 0 ? '+' : ''}{optimisticChange.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Hold/Buy/Sell Decision Matrix Table */}
+        <div className="space-y-1.5">
+          <span className="text-[10px] text-gray-500 uppercase font-semibold tracking-wider">Holding Action Matrix</span>
+          <div className="border border-white/5 rounded-xl overflow-hidden bg-white/[0.005]">
+            <div className="grid grid-cols-[3fr_2fr_5fr] gap-2 px-3 py-2 bg-white/[0.02] border-b border-white/5 text-[9px] font-semibold text-gray-500 uppercase tracking-wider">
+              <span>Ticker / Wt</span>
+              <span className="text-center">Action</span>
+              <span>Rationale</span>
+            </div>
+            <div className="divide-y divide-white/5 max-h-[160px] overflow-y-auto no-scrollbar">
+              {decisions.map((dec, idx) => (
+                <div key={idx} className="grid grid-cols-[3fr_2fr_5fr] gap-2 px-3 py-2 text-xs items-center">
+                  <div className="min-w-0">
+                    <div className="font-semibold text-white truncate">{dec.ticker}</div>
+                    <div className="text-[9px] text-gray-500 font-mono">{dec.weight.toFixed(1)}% wt</div>
+                  </div>
+                  <div className="flex justify-center">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${dec.badgeColor}`}>
+                      {dec.recommendation}
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-gray-400 leading-tight">
+                    {dec.rationale}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
 function SectorRebalancingCard({ portfolio }: { portfolio: PortfolioEntry[] }) {
   if (portfolio.length === 0) return null
 
@@ -653,6 +858,196 @@ function ActiveAlertsCard({
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function PortfolioStressTester({ portfolio, totalValue }: { portfolio: PortfolioEntry[]; totalValue: number }) {
+  const [selectedScenario, setSelectedScenario] = useState<string>('correction')
+
+  if (portfolio.length === 0) return null
+
+  const scenarios = [
+    {
+      id: 'correction',
+      name: 'Market Crash (-30%)',
+      desc: 'Simulates a broad market capitulation (similar to 2008 or March 2020).',
+    },
+    {
+      id: 'inflation',
+      name: 'High Inflation Spike',
+      desc: 'Simulates high inflation where Commodities rise but Tech and Real Estate slump.',
+    },
+    {
+      id: 'growth',
+      name: 'Tech & Growth Boom',
+      desc: 'Simulates a high-liquidity tech bull run led by software and automation.',
+    },
+    {
+      id: 'rates',
+      name: 'Rising Interest Rates',
+      desc: 'Simulates central bank rate hikes favoring banks but hurting tech and real estate.',
+    }
+  ]
+
+  let simulatedTotal = 0
+  
+  portfolio.forEach(p => {
+    const val = (p.current_price ?? p.buy_price) * p.quantity
+    const sector = (p.sector || '').toLowerCase()
+    
+    let changePct = 0
+    if (selectedScenario === 'correction') {
+      changePct = -30
+    } else if (selectedScenario === 'inflation') {
+      if (sector.includes('tech') || sector.includes('it') || sector.includes('information')) {
+        changePct = -15
+      } else if (sector.includes('realty') || sector.includes('estate') || sector.includes('infra')) {
+        changePct = -10
+      } else if (sector.includes('bank') || sector.includes('financial') || sector.includes('insurance')) {
+        changePct = 10
+      } else if (sector.includes('energy') || sector.includes('oil') || sector.includes('commodity') || sector.includes('metal') || sector.includes('steel') || sector.includes('power')) {
+        changePct = 20
+      } else {
+        changePct = -5
+      }
+    } else if (selectedScenario === 'growth') {
+      if (sector.includes('tech') || sector.includes('it') || sector.includes('information')) {
+        changePct = 35
+      } else if (sector.includes('bank') || sector.includes('financial') || sector.includes('insurance')) {
+        changePct = 10
+      } else {
+        changePct = 5
+      }
+    } else if (selectedScenario === 'rates') {
+      if (sector.includes('tech') || sector.includes('it') || sector.includes('information')) {
+        changePct = -12
+      } else if (sector.includes('realty') || sector.includes('estate') || sector.includes('infra')) {
+        changePct = -18
+      } else if (sector.includes('bank') || sector.includes('financial') || sector.includes('insurance')) {
+        changePct = 15
+      } else {
+        changePct = -2
+      }
+    }
+    
+    simulatedTotal += val * (1 + changePct / 100)
+  })
+
+  const diff = simulatedTotal - totalValue
+  const diffPct = totalValue > 0 ? (diff / totalValue) * 100 : 0
+  const isPos = diff >= 0
+
+  const techExposure = portfolio.reduce((sum, p) => {
+    const sector = (p.sector || '').toLowerCase()
+    if (sector.includes('tech') || sector.includes('it') || sector.includes('information')) {
+      return sum + (p.current_price ?? p.buy_price) * p.quantity
+    }
+    return sum
+  }, 0)
+  const techWeight = totalValue > 0 ? (techExposure / totalValue) * 100 : 0
+
+  let advice = ""
+  if (selectedScenario === 'correction') {
+    advice = "To buffer against broad market crashes, maintain a cash reserve (10-15%) or allocate to defensive low-beta sectors like Fast-Moving Consumer Goods (FMCG) and Pharmaceuticals."
+  } else if (selectedScenario === 'inflation') {
+    if (techWeight > 30) {
+      advice = `Your high tech exposure (${techWeight.toFixed(0)}%) is vulnerable to inflation spikes. Hedging with commodity-focused positions, commodities, or materials is recommended.`
+    } else {
+      advice = "Your balanced sector exposure keeps inflation risk low. Adding a slice of commodities or value cyclicals could further boost resilience."
+    }
+  } else if (selectedScenario === 'growth') {
+    advice = "A growth boom favors high-beta tech stocks. Ensure you participate while keeping capital efficiency (high ROE/ROCE) metrics in check to avoid speculative bubbles."
+  } else if (selectedScenario === 'rates') {
+    if (techWeight > 25) {
+      advice = `Rate hikes trigger multiple contraction in growth sectors. Consider rotating some Tech gains (${techWeight.toFixed(0)}% weight) into financials/banks to capture rising net interest margins.`
+    } else {
+      advice = "Your moderate growth exposure leaves you well positioned. Banks/Financials in your portfolio will benefit from higher credit yields during rate cycles."
+    }
+  }
+
+  return (
+    <div className="card space-y-4 border-white/5 bg-white/[0.02] backdrop-blur-md relative overflow-hidden group">
+      <div>
+        <h3 className="section-title text-brand-400 flex items-center gap-1.5">
+          <ShieldAlert size={14} /> Macro Economic Scenario Stress Simulator
+        </h3>
+        <p className="text-xs text-gray-500 mt-0.5">Simulate macroeconomic shocks on your live holdings to audit valuation impact.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="space-y-2 md:border-r md:border-white/5 md:pr-4">
+          <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Select Scenario</label>
+          <div className="flex flex-col gap-1.5">
+            {scenarios.map(sc => (
+              <button
+                key={sc.id}
+                type="button"
+                onClick={() => setSelectedScenario(sc.id)}
+                className={`text-left text-xs font-semibold px-3 py-2 rounded-lg border transition-all ${
+                  selectedScenario === sc.id
+                    ? 'bg-brand-500/10 border-brand-500/30 text-brand-400'
+                    : 'bg-white/[0.01] border-white/5 hover:border-white/10 text-gray-400 hover:text-white'
+                }`}
+              >
+                {sc.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="col-span-2 space-y-4">
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase font-semibold">Scenario Outlook</p>
+            <p className="text-xs text-gray-400 leading-normal mt-0.5">
+              {scenarios.find(s => s.id === selectedScenario)?.desc}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="p-3 bg-white/[0.01] border border-white/5 rounded-xl">
+              <span className="text-[10px] text-gray-500 uppercase font-semibold">Simulated Value</span>
+              <div className="text-sm font-bold font-mono text-white mt-1">
+                ₹{Math.round(simulatedTotal).toLocaleString('en-IN')}
+              </div>
+            </div>
+
+            <div className="p-3 bg-white/[0.01] border border-white/5 rounded-xl">
+              <span className="text-[10px] text-gray-500 uppercase font-semibold">Simulated Return</span>
+              <div className={`text-sm font-bold font-mono mt-1 ${isPos ? 'text-brand-400' : 'text-red-400'}`}>
+                {isPos ? '+' : ''}₹{Math.round(diff).toLocaleString('en-IN')} ({isPos ? '+' : ''}{diffPct.toFixed(1)}%)
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-1 pt-1">
+            <div className="h-2 w-full rounded-full bg-white/5 relative overflow-hidden">
+              <div 
+                className={`h-full rounded-full transition-all duration-500 ${
+                  isPos ? 'bg-gradient-to-r from-brand-500 to-emerald-400' : 'bg-gradient-to-r from-red-500 to-rose-400'
+                }`}
+                style={{ 
+                  width: `${Math.min(100, isPos ? 50 + (diffPct * 2) : 50 + (diffPct * 1.5))}%`,
+                  marginLeft: `${isPos ? '50%' : `calc(50% + ${diffPct * 1.5}%)`}`
+                }}
+              />
+              <div className="absolute top-0 bottom-0 left-1/2 w-0.5 bg-white/20" />
+            </div>
+            <div className="flex justify-between text-[8px] text-gray-500 font-mono">
+              <span>Severe Loss (-50%)</span>
+              <span>Baseline (Current)</span>
+              <span>Growth (+50%)</span>
+            </div>
+          </div>
+
+          <div className="p-3 bg-white/[0.01] border border-white/5 rounded-xl">
+            <div className="text-[10px] text-gray-500 uppercase font-semibold">🛡️ Dynamic Hedging Action</div>
+            <p className="text-[11px] text-gray-400 leading-normal mt-1">
+              {advice}
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -952,6 +1347,9 @@ export default function DashboardPage() {
           {/* Interactive Milestone Planner */}
           <GoalMilestonePlanner totalValue={totalCurrent} />
 
+          {/* Portfolio Scenario Stress Testing Simulator */}
+          <PortfolioStressTester portfolio={portfolio} totalValue={totalCurrent} />
+
           {/* Bottom Left Grid: News & Alerts */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Holdings & Market News with Sentiment Badging */}
@@ -1098,6 +1496,14 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
+
+          {/* Sharpe Optimizer & Path Forecaster */}
+          <SharpeOptimizerCard 
+            portfolio={portfolio} 
+            performance={performance} 
+            totalValue={totalCurrent} 
+          />
+
 
         </div>
       </div>

@@ -19,6 +19,11 @@ export interface PortfolioEntry {
   pnl_percent?: number
   sector?: string
   industry?: string
+  stock_pe?: number | null
+  roe?: number | null
+  roce?: number | null
+  high?: number | null
+  low?: number | null
 }
 
 export interface PredictionItem {
@@ -49,6 +54,10 @@ export interface StockData {
   face_value: number | null
   sector?: string
   industry?: string
+  rsi?: number | null
+  rsi_signal?: string | null
+  sma_50?: number | null
+  sma_50_signal?: string | null
   last_updated: string | null
   from_cache?: boolean
   week_52_high?: number | null

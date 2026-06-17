@@ -1,12 +1,12 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { TrendingUp, TrendingDown, Eye, Plus, Trash2, Wallet, Activity, Search, RefreshCw, Sparkles, List, Grid, Info, X } from 'lucide-react'
-import { userApi, stockApi } from '@/lib/api'
+import { TrendingUp, TrendingDown, Eye, Plus, Trash2, Wallet, Activity, Search, RefreshCw, Sparkles, List, Grid, Info, X, Bell, BarChart2 } from 'lucide-react'
+import { userApi, stockApi, alertApi } from '@/lib/api'
 import { StockData } from '@/types'
 import toast from 'react-hot-toast'
 import AddStockModal from '@/components/portfolio/AddStockModal'
 import { useAuthStore } from '@/lib/store'
-import { AreaChart, Area, ResponsiveContainer } from 'recharts'
+import { AreaChart, Area, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
 
 function WatchlistSparkline({ ticker, positive }: { ticker: string; positive: boolean }) {
   const [sparkData, setSparkData] = useState<any[]>([])
@@ -398,16 +398,363 @@ function StockInsightsModal({ stock, onClose, onInvest }: { stock: StockData; on
   )
 }
 
+function QuickAlertModal({ 
+  ticker, 
+  exchange, 
+  currentPrice, 
+  onClose 
+}: { 
+  ticker: string; 
+  exchange: string; 
+  currentPrice: number | null; 
+  onClose: () => void;
+}) {
+  const [targetPrice, setTargetPrice] = useState('')
+  const [stopLoss, setStopLoss] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!targetPrice && !stopLoss) {
+      toast.error("Set at least a target price or stop loss")
+      return
+    }
+
+    setLoading(true)
+    try {
+      await alertApi.create({
+        ticker,
+        exchange,
+        target_price: targetPrice ? parseFloat(targetPrice) : null,
+        stop_loss: stopLoss ? parseFloat(stopLoss) : null,
+        note: `Watchlist quick alert for ${ticker}`
+      })
+      toast.success(`Price alert configured for ${ticker}`)
+      onClose()
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "Failed to configure price alert")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <form onSubmit={handleSubmit} className="w-full max-w-sm bg-[#090d16]/95 border border-white/10 rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4 animate-scale-up">
+        <div className="flex justify-between items-start">
+          <div>
+            <h3 className="text-base font-bold text-white flex items-center gap-1.5">
+              <Bell size={16} className="text-brand-400" /> Create Price Alert
+            </h3>
+            <p className="text-[10px] text-gray-500 mt-0.5">Alerts notify your telegram chatbot link.</p>
+          </div>
+          <button type="button" onClick={onClose} className="text-gray-500 hover:text-white p-1 rounded-lg hover:bg-white/5">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-3 bg-white/[0.01] border border-white/5 rounded-xl flex justify-between items-center text-xs">
+          <div>
+            <span className="font-bold text-white">{ticker}</span>
+            <span className="text-[9px] text-gray-500 uppercase ml-1.5">{exchange}</span>
+          </div>
+          <span className="font-mono text-gray-400">Current: ₹{currentPrice?.toLocaleString('en-IN') ?? '—'}</span>
+        </div>
+
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Target Price (₹)</label>
+            <input 
+              type="number"
+              step="any"
+              className="input text-xs py-2"
+              placeholder="Trigger when price goes above..."
+              value={targetPrice}
+              onChange={(e) => setTargetPrice(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Stop Loss (₹)</label>
+            <input 
+              type="number"
+              step="any"
+              className="input text-xs py-2"
+              placeholder="Trigger when price drops below..."
+              value={stopLoss}
+              onChange={(e) => setStopLoss(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2 border-t border-white/5">
+          <button type="button" onClick={onClose} className="btn-outline text-xs px-4 py-2 bg-white/[0.01] border-white/5">
+            Cancel
+          </button>
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="btn-primary text-xs px-4 py-2 flex items-center gap-1.5"
+          >
+            {loading ? 'Creating...' : 'Create Alert'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function StockCompareModal({ stocks, onClose }: { stocks: StockData[]; onClose: () => void }) {
+  const chartData = stocks.map(s => ({
+    name: s.ticker,
+    ROCE: s.roce || 0,
+    ROE: s.roe || 0
+  }))
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-4xl bg-[#090d16]/95 border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-scale-up">
+        {/* Header */}
+        <div className="p-5 border-b border-white/5 flex justify-between items-center">
+          <div>
+            <h2 className="text-lg font-bold text-white flex items-center gap-1.5">
+              <BarChart2 size={18} className="text-brand-400" /> Stock Comparison Matrix
+            </h2>
+            <p className="text-xs text-gray-500 mt-0.5">Compare key efficiency, valuation, and return metrics side-by-side.</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/5">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Content area */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
+          <div className="overflow-x-auto no-scrollbar rounded-xl border border-white/5 bg-white/[0.01]">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-white/5 bg-white/[0.02] text-[10px] uppercase font-bold text-gray-500 tracking-wider">
+                  <th className="p-3">Metric</th>
+                  {stocks.map(s => (
+                    <th key={s.ticker} className="p-3 text-right text-white font-bold">{s.ticker}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                <tr>
+                  <td className="p-3 font-semibold text-gray-400">Current Price</td>
+                  {stocks.map(s => (
+                    <td key={s.ticker} className="p-3 text-right font-mono font-bold text-white">
+                      ₹{s.current_price?.toLocaleString('en-IN') ?? '—'}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td className="p-3 font-semibold text-gray-400">P/E Ratio</td>
+                  {stocks.map(s => (
+                    <td key={s.ticker} className="p-3 text-right font-mono text-white">
+                      {s.stock_pe ?? '—'}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td className="p-3 font-semibold text-gray-400">ROCE</td>
+                  {stocks.map(s => (
+                    <td key={s.ticker} className="p-3 text-right font-mono text-brand-400 font-bold">
+                      {s.roce ? `${s.roce}%` : '—'}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td className="p-3 font-semibold text-gray-400">ROE</td>
+                  {stocks.map(s => (
+                    <td key={s.ticker} className="p-3 text-right font-mono text-brand-400 font-bold">
+                      {s.roe ? `${s.roe}%` : '—'}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td className="p-3 font-semibold text-gray-400">Dividend Yield</td>
+                  {stocks.map(s => (
+                    <td key={s.ticker} className="p-3 text-right font-mono text-white">
+                      {s.dividend_yield ? `${s.dividend_yield}%` : '—'}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td className="p-3 font-semibold text-gray-400">Market Cap</td>
+                  {stocks.map(s => (
+                    <td key={s.ticker} className="p-3 text-right font-mono text-white">
+                      {s.market_cap ? `₹${s.market_cap.toLocaleString('en-IN')} Cr` : '—'}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td className="p-3 font-semibold text-gray-400">14-Day RSI</td>
+                  {stocks.map(s => (
+                    <td key={s.ticker} className="p-3 text-right font-mono text-white">
+                      {s.rsi !== undefined && s.rsi !== null ? (
+                        <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded ${
+                          s.rsi_signal === 'Oversold' ? 'bg-brand-500/10 text-brand-400' :
+                          s.rsi_signal === 'Overbought' ? 'bg-red-500/10 text-red-400' :
+                          'bg-white/5 text-gray-400'
+                        }`}>
+                          {s.rsi.toFixed(1)} ({s.rsi_signal || 'Neutral'})
+                        </span>
+                      ) : '—'}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td className="p-3 font-semibold text-gray-400">SMA-50 Crossover</td>
+                  {stocks.map(s => (
+                    <td key={s.ticker} className="p-3 text-right font-mono text-white">
+                      {s.sma_50 !== undefined && s.sma_50 !== null ? (
+                        <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded ${
+                          s.sma_50_signal === 'Bullish' ? 'bg-brand-500/10 text-brand-400' :
+                          s.sma_50_signal === 'Bearish' ? 'bg-red-500/10 text-red-400' :
+                          'bg-white/5 text-gray-400'
+                        }`}>
+                          {s.sma_50_signal || 'Neutral'} (₹{s.sma_50.toLocaleString('en-IN')})
+                        </span>
+                      ) : '—'}
+                    </td>
+                  ))}
+                </tr>
+                <tr>
+                  <td className="p-3 font-semibold text-gray-400">Sector</td>
+                  {stocks.map(s => (
+                    <td key={s.ticker} className="p-3 text-right text-gray-400">
+                      {s.sector || '—'}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="space-y-2">
+            <h4 className="text-xs font-semibold text-white uppercase tracking-wider">Return efficiency comparison (ROCE vs. ROE)</h4>
+            <div className="h-60 bg-white/[0.01] border border-white/5 rounded-xl p-4">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#182030" />
+                  <XAxis dataKey="name" tick={{ fill: '#4b5563', fontSize: 10 }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fill: '#4b5563', fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
+                  <Tooltip 
+                    contentStyle={{ background: '#0e1420', border: '1px solid #182030', borderRadius: 8, fontSize: 11 }}
+                    labelStyle={{ color: '#9ca3af' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 10 }} />
+                  <Bar dataKey="ROCE" fill="#26a366" radius={[4, 4, 0, 0]} name="ROCE (%)" />
+                  <Bar dataKey="ROE" fill="#3b82f6" radius={[4, 4, 0, 0]} name="ROE (%)" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 border-t border-white/5 bg-white/[0.01] flex justify-end">
+          <button onClick={onClose} className="btn-primary text-xs px-5 py-2">
+            Close comparison
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function WatchlistSummaryRibbon({ watchlist }: { watchlist: StockData[] }) {
+  if (watchlist.length === 0) return null
+
+  const count = watchlist.length
+
+  const peList = watchlist.map(w => w.stock_pe).filter(pe => pe !== null && pe > 0) as number[]
+  const avgPE = peList.length > 0 ? peList.reduce((s, p) => s + p, 0) / peList.length : null
+
+  let totalChangePct = 0
+  let changeCount = 0
+  watchlist.forEach(w => {
+    if (w.current_price && w.previous_close && w.previous_close > 0) {
+      const chg = ((w.current_price - w.previous_close) / w.previous_close) * 100
+      totalChangePct += chg
+      changeCount++
+    }
+  })
+  const avgChange = changeCount > 0 ? totalChangePct / changeCount : null
+
+  let totalVol = 0
+  let volCount = 0
+  watchlist.forEach(w => {
+    if (w.high && w.low && w.high > w.low) {
+      const vol = Math.log(w.high / w.low) / Math.sqrt(4 * Math.log(2))
+      totalVol += vol
+      volCount++
+    }
+  })
+  const avgVol = volCount > 0 ? (totalVol / volCount) * 100 : null
+
+  const bullishCount = watchlist.filter(w => w.sma_50_signal === 'Bullish').length
+  const oversoldCount = watchlist.filter(w => w.rsi_signal === 'Oversold').length
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-5 gap-4 animate-slide-up">
+      <div className="card py-3.5 px-4 relative overflow-hidden border-white/5 bg-white/[0.02] backdrop-blur-md">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Watched Assets</span>
+        <div className="text-lg font-bold font-mono text-white mt-1">{count} Ticker{count !== 1 ? 's' : ''}</div>
+      </div>
+
+      <div className="card py-3.5 px-4 relative overflow-hidden border-white/5 bg-white/[0.02] backdrop-blur-md">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Average P/E Ratio</span>
+        <div className="text-lg font-bold font-mono text-white mt-1">
+          {avgPE !== null ? `${avgPE.toFixed(1)}x` : '—'}
+        </div>
+      </div>
+
+      <div className="card py-3.5 px-4 relative overflow-hidden border-white/5 bg-white/[0.02] backdrop-blur-md">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Avg Day Change %</span>
+        <div className="text-lg font-bold font-mono mt-1">
+          {avgChange !== null ? (
+            <span className={avgChange >= 0 ? 'text-brand-400' : 'text-red-400'}>
+              {avgChange >= 0 ? '+' : ''}{avgChange.toFixed(2)}%
+            </span>
+          ) : '—'}
+        </div>
+      </div>
+
+      <div className="card py-3.5 px-4 relative overflow-hidden border-white/5 bg-white/[0.02] backdrop-blur-md">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Watchlist Volatility</span>
+        <div className="text-lg font-bold font-mono text-blue-400 mt-1">
+          {avgVol !== null ? `${avgVol.toFixed(1)}%` : '—'}
+        </div>
+      </div>
+
+      <div className="card py-3.5 px-4 relative overflow-hidden border-white/5 bg-white/[0.02] backdrop-blur-md">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Technical Signal Summary</span>
+        <div className="text-lg font-bold font-mono text-emerald-400 mt-1">
+          {bullishCount} Bullish
+          <span className="text-[10px] text-gray-500 font-semibold font-sans ml-1.5">({oversoldCount} Oversold)</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function WatchedStockCard({ 
   stock, 
   onRemove, 
   onInvest,
-  onOpenInsights
+  onOpenInsights,
+  onOpenAlert,
+  isSelected,
+  onSelect
 }: { 
   stock: StockData; 
   onRemove: (ticker: string) => void;
   onInvest: (ticker: string) => void;
   onOpenInsights: (stock: StockData) => void;
+  onOpenAlert: (stock: StockData) => void;
+  isSelected: boolean;
+  onSelect: (ticker: string) => void;
 }) {
   const change = stock.current_price && stock.previous_close ? stock.current_price - stock.previous_close : null
   const changePct = change && stock.previous_close ? (change / stock.previous_close) * 100 : null
@@ -436,7 +783,17 @@ function WatchedStockCard({
     <div className="card relative overflow-hidden border-white/5 bg-white/[0.02] backdrop-blur-md hover:border-white/10 transition-all duration-300 group">
       <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${positive ? 'from-brand-500/40 via-brand-500/10 to-brand-500/0' : 'from-red-500/40 via-red-500/10 to-red-500/0'}`} />
 
-      <div className="flex justify-between items-start mb-2.5">
+      {/* Selector Checkbox */}
+      <div className="absolute top-3 left-3 z-10 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
+        <input 
+          type="checkbox"
+          checked={isSelected}
+          onChange={() => onSelect(stock.ticker)}
+          className="h-3.5 w-3.5 rounded border-white/10 bg-[#0e1420] text-brand-500 focus:ring-0 cursor-pointer"
+        />
+      </div>
+
+      <div className="flex justify-between items-start mb-2.5 pl-6 group-hover:pl-6 transition-all">
         <div>
           <div className="flex items-center gap-2">
             <span className="font-bold text-sm text-white">{stock.ticker}</span>
@@ -452,7 +809,7 @@ function WatchedStockCard({
         )}
       </div>
 
-      <div className="flex items-baseline justify-between mb-3">
+      <div className="flex items-baseline justify-between mb-3 pl-6 group-hover:pl-6 transition-all">
         <span className="text-xl font-bold font-mono text-white">
           {stock.current_price ? `₹${stock.current_price.toLocaleString('en-IN')}` : '—'}
         </span>
@@ -465,13 +822,31 @@ function WatchedStockCard({
         <WatchlistSparkline ticker={stock.ticker} positive={positive} />
       </div>
 
-      <div className="flex gap-1.5 mb-4">
+      <div className="flex flex-wrap gap-1.5 mb-4">
         <span className={`text-[9px] font-semibold px-2 py-0.5 rounded border ${valuationColor}`}>
           {valuationClass}
         </span>
         <span className="text-[9px] font-semibold px-2 py-0.5 rounded bg-white/5 border border-white/5 text-blue-400">
           {volatilityClass}
         </span>
+        {stock.rsi !== undefined && stock.rsi !== null && (
+          <span className={`text-[9px] font-semibold px-2 py-0.5 rounded border ${
+            stock.rsi_signal === 'Oversold' ? 'bg-brand-500/10 border-brand-500/20 text-brand-400' :
+            stock.rsi_signal === 'Overbought' ? 'bg-red-500/10 border-red-500/20 text-red-400' :
+            'bg-white/5 border-white/5 text-gray-400'
+          }`}>
+            RSI: {stock.rsi.toFixed(0)} ({stock.rsi_signal || 'Neutral'})
+          </span>
+        )}
+        {stock.sma_50 !== undefined && stock.sma_50 !== null && (
+          <span className={`text-[9px] font-semibold px-2 py-0.5 rounded border ${
+            stock.sma_50_signal === 'Bullish' ? 'bg-brand-500/10 border-brand-500/20 text-brand-400' :
+            stock.sma_50_signal === 'Bearish' ? 'bg-red-500/10 border-red-500/20 text-red-400' :
+            'bg-white/5 border-white/5 text-gray-400'
+          }`}>
+            SMA-50: {stock.sma_50_signal || 'Neutral'}
+          </span>
+        )}
       </div>
 
       <div className="flex justify-between items-center gap-2 pt-1">
@@ -483,8 +858,15 @@ function WatchedStockCard({
           <Trash2 size={14} />
         </button>
         <button 
+          onClick={() => onOpenAlert(stock)} 
+          className="btn-icon text-gray-500 hover:text-brand-400 hover:bg-brand-500/10 rounded-lg p-2"
+          title="Configure Price Alert"
+        >
+          <Bell size={14} />
+        </button>
+        <button 
           onClick={() => onOpenInsights(stock)} 
-          className="btn-outline text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 bg-white/[0.02]"
+          className="btn-outline text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 bg-white/[0.02] text-white hover:bg-white/5 border-white/5"
           title="View Analytics"
         >
           <Info size={12} /> Insights
@@ -510,12 +892,20 @@ export default function WatchlistPage() {
   const [adding, setAdding] = useState(false)
   const [investingTicker, setInvestingTicker] = useState<string | null>(null)
   const [selectedStock, setSelectedStock] = useState<StockData | null>(null)
+  const [alertingStock, setAlertingStock] = useState<StockData | null>(null)
 
+  // Layout and Filters
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid')
   const [sortBy, setSortBy] = useState<'ticker' | 'price' | 'change' | 'pe'>('ticker')
   const [filterSector, setFilterSector] = useState<string>('ALL')
   const [filterValuation, setFilterValuation] = useState<string>('ALL')
   const [filterVolatility, setFilterVolatility] = useState<string>('ALL')
+  const [filterRsi, setFilterRsi] = useState<string>('ALL')
+  const [filterSma, setFilterSma] = useState<string>('ALL')
+
+  // Multi-Selection Comparison Drawer
+  const [selectedTickers, setSelectedTickers] = useState<string[]>([])
+  const [showCompareModal, setShowCompareModal] = useState(false)
 
   const suggestionsRef = useRef<HTMLDivElement>(null)
 
@@ -590,6 +980,7 @@ export default function WatchlistPage() {
     try {
       await userApi.removeFromWatchlist(ticker)
       toast.success(`${ticker} removed from watchlist`)
+      setSelectedTickers(prev => prev.filter(t => t !== ticker))
       refreshUser()
       fetchWatchlist()
     } catch {
@@ -603,6 +994,18 @@ export default function WatchlistPage() {
 
   function handleOpenInsights(stock: StockData) {
     setSelectedStock(stock)
+  }
+
+  function handleOpenAlert(stock: StockData) {
+    setAlertingStock(stock)
+  }
+
+  function handleSelectTicker(ticker: string) {
+    setSelectedTickers(prev => 
+      prev.includes(ticker) 
+        ? prev.filter(t => t !== ticker) 
+        : [...prev, ticker]
+    )
   }
 
   const sectorsList = Array.from(new Set(watchlist.map(w => w.sector).filter(Boolean))) as string[]
@@ -624,6 +1027,8 @@ export default function WatchlistPage() {
       else if (vol > 0.15) volatilityClass = "Moderate"
     }
     if (filterVolatility !== 'ALL' && volatilityClass !== filterVolatility) return false
+    if (filterRsi !== 'ALL' && stock.rsi_signal !== filterRsi) return false
+    if (filterSma !== 'ALL' && stock.sma_50_signal !== filterSma) return false
 
     return true
   }).sort((a, b) => {
@@ -641,8 +1046,19 @@ export default function WatchlistPage() {
     return a.ticker.localeCompare(b.ticker)
   })
 
+  function handleSelectAll() {
+    if (selectedTickers.length === filteredAndSortedWatchlist.length) {
+      setSelectedTickers([])
+    } else {
+      setSelectedTickers(filteredAndSortedWatchlist.map(s => s.ticker))
+    }
+  }
+
+  // Get compared stock list
+  const comparedStocks = watchlist.filter(s => selectedTickers.includes(s.ticker))
+
   return (
-    <div className="space-y-6 animate-fade-in pb-12">
+    <div className="space-y-6 animate-fade-in pb-24">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
@@ -655,6 +1071,9 @@ export default function WatchlistPage() {
           <RefreshCw size={14} /> Refresh Screener
         </button>
       </div>
+
+      {/* Top Summary Analytics Ribbon */}
+      <WatchlistSummaryRibbon watchlist={watchlist} />
 
       {/* Add Stock Banner with Autocomplete */}
       <div ref={suggestionsRef} className="relative w-full">
@@ -755,6 +1174,34 @@ export default function WatchlistPage() {
                 <option value="High Vol">High Volatility</option>
               </select>
             </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500">RSI Signal</span>
+              <select
+                value={filterRsi}
+                onChange={(e) => setFilterRsi(e.target.value)}
+                className="bg-[#0e1420] border border-white/5 hover:border-white/10 rounded-lg text-xs font-semibold text-gray-300 py-1.5 px-3 focus:outline-none transition-colors"
+              >
+                <option value="ALL">All RSI</option>
+                <option value="Oversold">Oversold (&le;30)</option>
+                <option value="Overbought">Overbought (&ge;70)</option>
+                <option value="Neutral">Neutral</option>
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-gray-500">SMA-50 Signal</span>
+              <select
+                value={filterSma}
+                onChange={(e) => setFilterSma(e.target.value)}
+                className="bg-[#0e1420] border border-white/5 hover:border-white/10 rounded-lg text-xs font-semibold text-gray-300 py-1.5 px-3 focus:outline-none transition-colors"
+              >
+                <option value="ALL">All SMA-50</option>
+                <option value="Bullish">Bullish</option>
+                <option value="Bearish">Bearish</option>
+                <option value="Neutral">Neutral</option>
+              </select>
+            </div>
           </div>
 
           <div className="flex items-center justify-between md:justify-end gap-4">
@@ -832,6 +1279,9 @@ export default function WatchlistPage() {
               onRemove={handleRemove}
               onInvest={handleInvest}
               onOpenInsights={handleOpenInsights}
+              onOpenAlert={handleOpenAlert}
+              isSelected={selectedTickers.includes(stock.ticker)}
+              onSelect={handleSelectTicker}
             />
           ))}
         </div>
@@ -840,12 +1290,22 @@ export default function WatchlistPage() {
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="border-b border-white/5 bg-white/[0.02] text-[10px] uppercase font-bold text-gray-500 tracking-wider">
+                <th className="p-4 w-10">
+                  <input 
+                    type="checkbox"
+                    checked={filteredAndSortedWatchlist.length > 0 && selectedTickers.length === filteredAndSortedWatchlist.length}
+                    onChange={handleSelectAll}
+                    className="h-3.5 w-3.5 rounded border-white/10 bg-[#0e1420] text-brand-500 focus:ring-0 cursor-pointer"
+                  />
+                </th>
                 <th className="p-4">Ticker</th>
                 <th className="p-4">Price</th>
                 <th className="p-4">Change</th>
                 <th className="p-4">Sector</th>
                 <th className="p-4">P/E Ratio</th>
                 <th className="p-4">Volatility</th>
+                <th className="p-4">RSI</th>
+                <th className="p-4">SMA-50</th>
                 <th className="p-4 w-32">Trend (24h)</th>
                 <th className="p-4 text-right">Actions</th>
               </tr>
@@ -878,6 +1338,14 @@ export default function WatchlistPage() {
                 return (
                   <tr key={stock.ticker} className="hover:bg-white/[0.02] transition-colors group">
                     <td className="p-4">
+                      <input 
+                        type="checkbox"
+                        checked={selectedTickers.includes(stock.ticker)}
+                        onChange={() => handleSelectTicker(stock.ticker)}
+                        className="h-3.5 w-3.5 rounded border-white/10 bg-[#0e1420] text-brand-500 focus:ring-0 cursor-pointer"
+                      />
+                    </td>
+                    <td className="p-4">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-white text-sm">{stock.ticker}</span>
                         <span className="badge-gray text-[9px] uppercase tracking-wider">{stock.exchange}</span>
@@ -908,6 +1376,28 @@ export default function WatchlistPage() {
                         {volatilityClass}
                       </span>
                     </td>
+                    <td className="p-4 font-mono">
+                      {stock.rsi !== undefined && stock.rsi !== null ? (
+                        <span className={`inline-block text-[9px] font-semibold px-2 py-0.5 rounded border ${
+                          stock.rsi_signal === 'Oversold' ? 'bg-brand-500/10 border-brand-500/15 text-brand-400' :
+                          stock.rsi_signal === 'Overbought' ? 'bg-red-500/10 border-red-500/15 text-red-400' :
+                          'bg-white/5 border-white/5 text-gray-400'
+                        }`}>
+                          {stock.rsi.toFixed(0)} ({stock.rsi_signal || 'Neutral'})
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td className="p-4">
+                      {stock.sma_50 !== undefined && stock.sma_50 !== null ? (
+                        <span className={`inline-block text-[9px] font-semibold px-2 py-0.5 rounded border ${
+                          stock.sma_50_signal === 'Bullish' ? 'bg-brand-500/10 border-brand-500/15 text-brand-400' :
+                          stock.sma_50_signal === 'Bearish' ? 'bg-red-500/10 border-red-500/15 text-red-400' :
+                          'bg-white/5 border-white/5 text-gray-400'
+                        }`}>
+                          {stock.sma_50_signal || 'Neutral'}
+                        </span>
+                      ) : '—'}
+                    </td>
                     <td className="p-4">
                       <WatchlistSparkline ticker={stock.ticker} positive={positive} />
                     </td>
@@ -919,6 +1409,13 @@ export default function WatchlistPage() {
                           title="View Analytics"
                         >
                           <Info size={14} />
+                        </button>
+                        <button 
+                          onClick={() => handleOpenAlert(stock)}
+                          className="btn-icon text-gray-500 hover:text-brand-400 hover:bg-brand-500/10 rounded-lg p-2"
+                          title="Configure Price Alert"
+                        >
+                          <Bell size={14} />
                         </button>
                         <button 
                           onClick={() => handleRemove(stock.ticker)} 
@@ -943,6 +1440,31 @@ export default function WatchlistPage() {
         </div>
       )}
 
+      {/* Floating Selected Tickers Compare Drawer */}
+      {selectedTickers.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-[#0a0f1d]/95 backdrop-blur-xl border border-brand-500/20 px-6 py-3.5 rounded-full shadow-[0_0_40px_rgba(38,163,102,0.2)] flex items-center gap-6 animate-slide-up">
+          <span className="text-xs font-semibold text-white">
+            {selectedTickers.length} Stock{selectedTickers.length !== 1 ? 's' : ''} Selected
+          </span>
+          <div className="flex gap-2">
+            <button 
+              onClick={() => setSelectedTickers([])}
+              className="btn-outline text-[10px] px-3.5 py-1.5 rounded-full bg-white/[0.01] border-white/10 text-white hover:bg-white/5"
+            >
+              Clear Selection
+            </button>
+            <button 
+              disabled={selectedTickers.length < 2}
+              onClick={() => setShowCompareModal(true)}
+              className="btn-primary text-[10px] px-3.5 py-1.5 rounded-full flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              title={selectedTickers.length < 2 ? "Select at least 2 stocks to compare" : "Compare selected stocks"}
+            >
+              <BarChart2 size={12} /> Compare Stats
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Modal for adding stock to portfolio */}
       {investingTicker && (
         <AddStockModal 
@@ -961,6 +1483,24 @@ export default function WatchlistPage() {
           stock={selectedStock}
           onClose={() => setSelectedStock(null)}
           onInvest={handleInvest}
+        />
+      )}
+
+      {/* Quick alert modal */}
+      {alertingStock && (
+        <QuickAlertModal
+          ticker={alertingStock.ticker}
+          exchange={alertingStock.exchange}
+          currentPrice={alertingStock.current_price}
+          onClose={() => setAlertingStock(null)}
+        />
+      )}
+
+      {/* Comparison Modal */}
+      {showCompareModal && (
+        <StockCompareModal
+          stocks={comparedStocks}
+          onClose={() => setShowCompareModal(false)}
         />
       )}
     </div>
