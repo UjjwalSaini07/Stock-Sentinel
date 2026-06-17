@@ -15,6 +15,81 @@ if not logger.handlers:
     ch.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
     logger.addHandler(ch)
 
+async def calculate_technicals(ticker: str) -> dict:
+    """Calculates 14-day RSI and 50-day SMA using Yahoo Finance."""
+    yf_ticker = ticker if "." in ticker else f"{ticker}.NS"
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_ticker}?range=3mo&interval=1d"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    try:
+        async with httpx.AsyncClient(headers=headers, timeout=6.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                data = resp.json()
+                chart = data.get("chart", {})
+                result = chart.get("result", [])
+                if result:
+                    indicators = result[0].get("indicators", {})
+                    quote = indicators.get("quote", [{}])[0]
+                    close_prices = [p for p in quote.get("close", []) if p is not None]
+                    
+                    if not close_prices or len(close_prices) < 15:
+                        return {}
+                    
+                    # 50-day SMA
+                    if len(close_prices) >= 50:
+                        sma_50 = sum(close_prices[-50:]) / 50.0
+                    else:
+                        sma_50 = sum(close_prices) / len(close_prices)
+                        
+                    # 14-day RSI
+                    deltas = []
+                    for i in range(1, len(close_prices)):
+                        deltas.append(close_prices[i] - close_prices[i-1])
+                        
+                    gains = [d if d > 0 else 0 for d in deltas]
+                    losses = [-d if d < 0 else 0 for d in deltas]
+                    
+                    # First average gain/loss
+                    avg_gain = sum(gains[:14]) / 14.0
+                    avg_loss = sum(losses[:14]) / 14.0
+                    
+                    # Wilder's smoothing
+                    for i in range(14, len(deltas)):
+                        avg_gain = (avg_gain * 13 + gains[i]) / 14.0
+                        avg_loss = (avg_loss * 13 + losses[i]) / 14.0
+                        
+                    rsi = 50.0
+                    if avg_loss > 0:
+                        rs = avg_gain / avg_loss
+                        rsi = 100 - (100 / (1 + rs))
+                    else:
+                        rsi = 100.0 if avg_gain > 0 else 50.0
+                        
+                    current_price = close_prices[-1]
+                    rsi_signal = "Neutral"
+                    if rsi >= 70:
+                        rsi_signal = "Overbought"
+                    elif rsi <= 30:
+                        rsi_signal = "Oversold"
+                        
+                    sma_signal = "Neutral"
+                    if current_price > sma_50:
+                        sma_signal = "Bullish"
+                    elif current_price < sma_50:
+                        sma_signal = "Bearish"
+                        
+                    return {
+                        "rsi": round(rsi, 2),
+                        "rsi_signal": rsi_signal,
+                        "sma_50": round(sma_50, 2),
+                        "sma_50_signal": sma_signal
+                    }
+    except Exception as e:
+        logger.error(f"Error calculating technicals for {ticker}: {e}")
+    return {}
+
 async def scrape_stock(ticker: str, exchange: str = "NSE") -> Optional[dict]:
     """
     Scrapes stock data in real-time from Screener.in and Google Finance.
@@ -142,6 +217,9 @@ async def scrape_stock(ticker: str, exchange: str = "NSE") -> Optional[dict]:
         logger.warning(f"Could not scrape price for {ticker}. Aborting write.")
         return None
 
+    # Calculate technical indicators
+    technicals = await calculate_technicals(ticker)
+
     # Construct document
     stock_data = {
         "ticker": ticker,
@@ -158,6 +236,10 @@ async def scrape_stock(ticker: str, exchange: str = "NSE") -> Optional[dict]:
         "face_value": face_value,
         "sector": sector if screener_html else None,
         "industry": industry if screener_html else None,
+        "rsi": technicals.get("rsi"),
+        "rsi_signal": technicals.get("rsi_signal"),
+        "sma_50": technicals.get("sma_50"),
+        "sma_50_signal": technicals.get("sma_50_signal"),
         "last_updated": datetime.now(timezone.utc)
     }
 

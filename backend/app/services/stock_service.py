@@ -242,6 +242,11 @@ async def get_portfolio_with_prices(portfolio: list) -> list:
         if stock:
             item["sector"] = stock.get("sector")
             item["industry"] = stock.get("industry")
+            item["stock_pe"] = stock.get("stock_pe")
+            item["roe"] = stock.get("roe")
+            item["roce"] = stock.get("roce")
+            item["high"] = stock.get("high")
+            item["low"] = stock.get("low")
             if stock.get("current_price"):
                 cp = stock["current_price"]
                 bp = entry["buy_price"]
