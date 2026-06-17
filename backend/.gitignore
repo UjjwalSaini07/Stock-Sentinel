@@ -1,0 +1,24 @@
+# Python local environments and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+venv/
+env/
+ENV/
+.venv/
+
+# Build and distribution
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Secrets (ignore local env but allow example template)
+.env
+!.env.example
+
+# Temporary files
+*.log
+tmp/
+temp/
