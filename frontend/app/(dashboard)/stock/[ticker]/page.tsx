@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   TrendingUp, TrendingDown, RefreshCw, ArrowLeft,
-  Plus, Bell, Bookmark, Info, Activity, BadgeDollarSign, Target, ShieldAlert
+  Plus, Bell, Bookmark, Info, Activity, BadgeDollarSign, Target, ShieldAlert, Eye
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
@@ -171,6 +171,27 @@ export default function StockDetailPage() {
   const [sparkData, setSparkData] = useState<any[]>([])
 
   const holding = user?.portfolio?.find(p => p.ticker === ticker?.toUpperCase())
+  const isWatched = user?.watchlist?.includes(ticker?.toUpperCase())
+  const [togglingWatch, setTogglingWatch] = useState(false)
+
+  async function handleToggleWatch() {
+    try {
+      setTogglingWatch(true)
+      const t = ticker?.toUpperCase()
+      if (isWatched) {
+        await userApi.removeFromWatchlist(t)
+        toast.success(`${t} removed from watchlist`)
+      } else {
+        await userApi.addToWatchlist(t)
+        toast.success(`${t} added to watchlist`)
+      }
+      refreshUser()
+    } catch {
+      toast.error("Failed to update watchlist")
+    } finally {
+      setTogglingWatch(false)
+    }
+  }
 
   const fetchStock = useCallback(async () => {
     try {
@@ -274,9 +295,17 @@ export default function StockDetailPage() {
               <button onClick={handleRefresh} disabled={refreshing} className="btn-icon" title="Refresh">
                 <RefreshCw size={15} className={refreshing ? 'animate-spin text-brand-400' : ''} />
               </button>
+              <button 
+                onClick={handleToggleWatch} 
+                disabled={togglingWatch} 
+                className={`btn-outline text-sm flex items-center gap-1.5 ${isWatched ? 'border-brand-500/50 text-brand-400 bg-brand-500/5' : 'text-gray-400'}`}
+                title={isWatched ? "Remove from watchlist" : "Add to watchlist"}
+              >
+                <Eye size={14} className={isWatched ? 'text-brand-400' : ''} /> {isWatched ? 'Watching' : 'Watch'}
+              </button>
               {!holding && (
-                <button onClick={() => setShowAddModal(true)} className="btn-outline text-sm flex items-center gap-1.5">
-                  <Plus size={14} /> Add
+                <button onClick={() => setShowAddModal(true)} className="btn-primary text-sm flex items-center gap-1.5">
+                  <Plus size={14} /> Invest
                 </button>
               )}
             </div>

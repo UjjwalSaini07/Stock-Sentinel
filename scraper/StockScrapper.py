@@ -83,6 +83,15 @@ def fetch_stock_data(ticker: str, exchange: str) -> dict:
             if previous_close_element:
                 previous_close = parse_numeric(previous_close_element.text)
 
+        peers_section = soup.select_one("#peers")
+        sector = None
+        industry = None
+        if peers_section:
+            market_links = peers_section.find_all("a", href=lambda h: h and h.startswith("/market/"))
+            if market_links:
+                sector = market_links[0].text.strip()
+                industry = market_links[-1].text.strip()
+
         return {
             "ticker": ticker,
             "exchange": exchange,
@@ -96,6 +105,8 @@ def fetch_stock_data(ticker: str, exchange: str) -> dict:
             "roce": parse_numeric(roce),
             "roe": parse_numeric(roe),
             "face_value": parse_numeric(face_value),
+            "sector": sector,
+            "industry": industry,
             "last_updated": datetime.now(timezone.utc)
         }
     except Exception as e:

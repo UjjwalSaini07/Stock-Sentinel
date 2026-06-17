@@ -234,17 +234,20 @@ async def search_tickers(query: str) -> list:
     return results
 
 async def get_portfolio_with_prices(portfolio: list) -> list:
-    """Enrich portfolio entries with live prices and P&L."""
+    """Enrich portfolio entries with live prices, P&L, sector, and industry."""
     enriched = []
     for entry in portfolio:
         stock = await get_stock_data(entry["ticker"])
         item = dict(entry)
-        if stock and stock.get("current_price"):
-            cp = stock["current_price"]
-            bp = entry["buy_price"]
-            qty = entry["quantity"]
-            item["current_price"] = cp
-            item["pnl"] = round((cp - bp) * qty, 2)
-            item["pnl_percent"] = round(((cp - bp) / bp) * 100, 2)
+        if stock:
+            item["sector"] = stock.get("sector")
+            item["industry"] = stock.get("industry")
+            if stock.get("current_price"):
+                cp = stock["current_price"]
+                bp = entry["buy_price"]
+                qty = entry["quantity"]
+                item["current_price"] = cp
+                item["pnl"] = round((cp - bp) * qty, 2)
+                item["pnl_percent"] = round(((cp - bp) / bp) * 100, 2)
         enriched.append(item)
     return enriched

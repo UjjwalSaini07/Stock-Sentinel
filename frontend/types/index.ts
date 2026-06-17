@@ -4,6 +4,7 @@ export interface User {
   name: string
   telegram_linked: boolean
   portfolio: PortfolioEntry[]
+  watchlist?: string[]
 }
 
 export interface PortfolioEntry {
@@ -16,6 +17,8 @@ export interface PortfolioEntry {
   current_price?: number
   pnl?: number
   pnl_percent?: number
+  sector?: string
+  industry?: string
 }
 
 export interface PredictionItem {
@@ -96,3 +99,44 @@ export interface SearchResult {
   company_name?: string
   change_pct?: number | null
 }
+
+export interface MarketIndex {
+  symbol: string
+  name: string
+  price: number
+  prev_close: number
+  change: number
+  change_percent: number
+}
+
+export interface NewsArticle {
+  ticker: string
+  title: string
+  link: string
+  pub_date: string
+  source: string
+}
+
+export interface PerformancePoint {
+  date: string
+  portfolio_value: number
+  portfolio_return: number
+  nifty_return: number
+  cost_basis: number
+}
+
+export interface PortfolioPerformance {
+  timeline: PerformancePoint[]
+  risk: {
+    beta: number
+    var_95: number
+    volatility: number
+    concentration_score: number
+  }
+  audit: {
+    weighted_pe: number | null
+    weighted_roe: number | null
+    est_annual_dividend: number
+  }
+}
+

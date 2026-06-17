@@ -122,6 +122,15 @@ async def scrape_stock(ticker: str, exchange: str = "NSE") -> Optional[dict]:
                     high = parse_numeric(parts[0])
                     low = parse_numeric(parts[1])
                     
+            peers_section = soup.select_one("#peers")
+            sector = None
+            industry = None
+            if peers_section:
+                market_links = peers_section.find_all("a", href=lambda h: h and h.startswith("/market/"))
+                if market_links:
+                    sector = market_links[0].text.strip()
+                    industry = market_links[-1].text.strip()
+
             logger.info(f"Screener.in fundamentals parsed for {ticker}")
         except Exception as e:
             logger.error(f"Error parsing Screener.in for {ticker}: {e}")
@@ -147,6 +156,8 @@ async def scrape_stock(ticker: str, exchange: str = "NSE") -> Optional[dict]:
         "roce": roce,
         "roe": roe,
         "face_value": face_value,
+        "sector": sector if screener_html else None,
+        "industry": industry if screener_html else None,
         "last_updated": datetime.now(timezone.utc)
     }
 
