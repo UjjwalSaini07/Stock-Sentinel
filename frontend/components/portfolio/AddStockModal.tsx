@@ -7,10 +7,11 @@ import { userApi, stockApi } from '@/lib/api'
 interface Props {
   onClose: () => void
   onAdded: () => void
+  prefilledTicker?: string
 }
 
-export default function AddStockModal({ onClose, onAdded }: Props) {
-  const [ticker, setTicker] = useState('')
+export default function AddStockModal({ onClose, onAdded, prefilledTicker = '' }: Props) {
+  const [ticker, setTicker] = useState(prefilledTicker)
   const [buyPrice, setBuyPrice] = useState('')
   const [quantity, setQuantity] = useState('')
   const [buyDate, setBuyDate] = useState(new Date().toISOString().split('T')[0])

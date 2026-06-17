@@ -47,6 +47,8 @@ export interface StockData {
   roce: number | null
   roe: number | null
   face_value: number | null
+  sector?: string
+  industry?: string
   last_updated: string | null
   from_cache?: boolean
   week_52_high?: number | null

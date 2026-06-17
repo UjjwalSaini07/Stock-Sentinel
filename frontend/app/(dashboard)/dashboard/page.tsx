@@ -1,18 +1,18 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Wallet, TrendingUp, TrendingDown, BarChart2, RefreshCw, ArrowUpRight, Activity, Info, ShieldAlert } from 'lucide-react'
+import { Plus, Wallet, TrendingUp, TrendingDown, BarChart2, RefreshCw, ArrowUpRight, Activity, Info, ShieldAlert, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { useAuthStore } from '@/lib/store'
 import StatCard from '@/components/ui/StatCard'
 import HoldingRow from '@/components/portfolio/HoldingRow'
 import AddStockModal from '@/components/portfolio/AddStockModal'
 import PortfolioDonut from '@/components/charts/PortfolioDonut'
-import { userApi, stockApi } from '@/lib/api'
+import { userApi, stockApi, alertApi } from '@/lib/api'
 import toast from 'react-hot-toast'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts'
-import { MarketIndex, NewsArticle, PortfolioPerformance } from '@/types'
+import { MarketIndex, NewsArticle, PortfolioPerformance, PortfolioEntry, Alert } from '@/types'
 
 function PortfolioInsights({ portfolio, performance }: { portfolio: any[], performance: PortfolioPerformance | null }) {
   if (portfolio.length === 0 || !performance) return null
@@ -334,6 +334,329 @@ function TaxAuditorCard({ portfolio }: { portfolio: any[] }) {
   )
 }
 
+function PortfolioRangePredictor({ totalValue, performance }: { totalValue: number; performance: PortfolioPerformance | null }) {
+  if (totalValue === 0 || !performance || !performance.risk.volatility) return null
+
+  const vol = performance.risk.volatility / 100
+  const t_30 = 30 / 365
+  const sd_30 = vol * Math.sqrt(t_30)
+
+  const lowerRange = totalValue * Math.exp(-sd_30)
+  const upperRange = totalValue * Math.exp(sd_30)
+
+  const lowerPct = ((lowerRange - totalValue) / totalValue) * 100
+  const upperPct = ((upperRange - totalValue) / totalValue) * 100
+
+  return (
+    <div className="card space-y-4 border-white/5 bg-white/[0.02] backdrop-blur-md relative overflow-hidden group">
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-brand-500/20 via-brand-500 to-brand-500/20" />
+      
+      <div className="flex justify-between items-start">
+        <div>
+          <h3 className="section-title text-brand-400 flex items-center gap-1.5">
+            <TrendingUp size={14} /> 30-Day Portfolio Range Predictor
+          </h3>
+          <p className="text-xs text-gray-500 mt-0.5">Statistical forecast of valuation boundaries based on weighted volatility.</p>
+        </div>
+        <span className="badge-green text-[9px] uppercase tracking-wider">68% Confidence</span>
+      </div>
+
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-3 bg-white/[0.01] border border-white/5 rounded-xl">
+            <span className="text-[10px] text-gray-500 uppercase font-semibold">Expected Downside</span>
+            <div className="text-sm font-bold font-mono text-red-400 mt-1">
+              ₹{Math.round(lowerRange).toLocaleString('en-IN')}
+            </div>
+            <div className="text-[10px] text-gray-500 font-mono mt-0.5">
+              {lowerPct.toFixed(1)}% shift
+            </div>
+          </div>
+
+          <div className="p-3 bg-white/[0.01] border border-white/5 rounded-xl">
+            <span className="text-[10px] text-gray-500 uppercase font-semibold">Expected Upside</span>
+            <div className="text-sm font-bold font-mono text-brand-400 mt-1">
+              ₹{Math.round(upperRange).toLocaleString('en-IN')}
+            </div>
+            <div className="text-[10px] text-gray-500 font-mono mt-0.5">
+              +{upperPct.toFixed(1)}% shift
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <div className="h-2 w-full rounded-full bg-gradient-to-r from-red-500/20 via-brand-500/20 to-brand-500/40 relative">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-white ring-4 ring-white/10" />
+          </div>
+          <div className="flex justify-between text-[9px] text-gray-500 font-mono">
+            <span>₹{Math.round(lowerRange).toLocaleString('en-IN')}</span>
+            <span>Current: ₹{Math.round(totalValue).toLocaleString('en-IN')}</span>
+            <span>₹{Math.round(upperRange).toLocaleString('en-IN')}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SectorRebalancingCard({ portfolio }: { portfolio: PortfolioEntry[] }) {
+  if (portfolio.length === 0) return null
+
+  const totalVal = portfolio.reduce((sum, p) => sum + (p.current_price ?? p.buy_price) * p.quantity, 0)
+  
+  const sectorValuationMap: { [key: string]: number } = {}
+  const sectorHoldingsMap: { [key: string]: string[] } = {}
+  
+  portfolio.forEach(p => {
+    const sector = p.sector || 'Other / Cash'
+    const val = (p.current_price ?? p.buy_price) * p.quantity
+    sectorValuationMap[sector] = (sectorValuationMap[sector] || 0) + val
+    
+    if (!sectorHoldingsMap[sector]) sectorHoldingsMap[sector] = []
+    sectorHoldingsMap[sector].push(p.ticker)
+  })
+
+  const sectorAnalysis = Object.entries(sectorValuationMap).map(([sectorName, val]) => {
+    const weight = totalVal > 0 ? (val / totalVal) * 100 : 0
+    let status: 'Optimal' | 'Overweight' | 'Underweight' = 'Optimal'
+    let colorClass = 'text-brand-400 bg-brand-500/10 border-brand-500/15'
+    let advice = 'Exposure is balanced.'
+
+    if (weight > 30) {
+      status = 'Overweight'
+      colorClass = 'text-red-400 bg-red-500/10 border-red-500/15'
+      advice = 'Trim exposure to reduce sector risk.'
+    } else if (weight < 10 && portfolio.length >= 3) {
+      status = 'Underweight'
+      colorClass = 'text-amber-400 bg-amber-500/10 border-amber-500/15'
+      advice = 'Consider building exposure in this sector.'
+    }
+
+    return {
+      name: sectorName,
+      value: val,
+      weight,
+      status,
+      colorClass,
+      advice,
+      tickers: sectorHoldingsMap[sectorName]
+    }
+  }).sort((a, b) => b.weight - a.weight)
+
+  return (
+    <div className="card space-y-4 border-white/5 bg-white/[0.02] backdrop-blur-md">
+      <div>
+        <h3 className="section-title text-brand-400 flex items-center gap-1.5">
+          <BarChart2 size={14} /> Sector Drift & Rebalancing
+        </h3>
+        <p className="text-xs text-gray-500 mt-0.5">Monitor sector concentrations and rebalance to mitigate risk.</p>
+      </div>
+
+      <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 no-scrollbar">
+        {sectorAnalysis.map(sect => (
+          <div key={sect.name} className="p-3 bg-white/[0.01] border border-white/5 hover:border-white/10 rounded-xl transition-all space-y-2">
+            <div className="flex justify-between items-center">
+              <div>
+                <span className="text-xs font-semibold text-white">{sect.name}</span>
+                <div className="text-[10px] text-gray-500 font-mono mt-0.5">
+                  ₹{Math.round(sect.value).toLocaleString('en-IN')} • {sect.tickers.join(', ')}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs font-bold text-white font-mono">{sect.weight.toFixed(1)}%</div>
+                <span className={`inline-block text-[9px] font-semibold px-2 py-0.5 rounded border mt-1 ${sect.colorClass}`}>
+                  {sect.status}
+                </span>
+              </div>
+            </div>
+            {sect.status !== 'Optimal' && (
+              <p className="text-[10px] text-gray-400 leading-normal bg-white/[0.02] p-1.5 rounded-lg border border-white/[0.02]">
+                💡 {sect.advice}
+              </p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function DividendForecasterCard({ performance }: { performance: PortfolioPerformance | null }) {
+  if (!performance || !performance.audit.est_annual_dividend) return null
+
+  const annualDiv = performance.audit.est_annual_dividend
+  const monthlyAvg = annualDiv / 12
+
+  const months = [
+    { name: 'Jan', weight: 0.3 },
+    { name: 'Feb', weight: 0.5 },
+    { name: 'Mar', weight: 0.8 },
+    { name: 'Apr', weight: 0.4 },
+    { name: 'May', weight: 0.7 },
+    { name: 'Jun', weight: 1.2 },
+    { name: 'Jul', weight: 2.2 },
+    { name: 'Aug', weight: 2.5 },
+    { name: 'Sep', weight: 1.5 },
+    { name: 'Oct', weight: 0.6 },
+    { name: 'Nov', weight: 0.8 },
+    { name: 'Dec', weight: 0.5 }
+  ]
+
+  const totalWeight = months.reduce((s, m) => s + m.weight, 0)
+  const monthlyData = months.map(m => ({
+    name: m.name,
+    amount: Math.round((m.weight / totalWeight) * annualDiv)
+  }))
+
+  return (
+    <div className="card space-y-4 border-white/5 bg-white/[0.02] backdrop-blur-md">
+      <div className="flex justify-between items-start">
+        <div>
+          <h3 className="section-title text-brand-400 flex items-center gap-1.5">
+            <Wallet size={14} /> Passive Income Forecast
+          </h3>
+          <p className="text-xs text-gray-500 mt-0.5">Estimated monthly dividend cash flows based on historical seasonality.</p>
+        </div>
+        <div className="text-right">
+          <span className="text-[10px] text-gray-500 uppercase font-semibold block">Total Annual</span>
+          <span className="text-sm font-bold font-mono text-white">₹{Math.round(annualDiv).toLocaleString('en-IN')}</span>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="p-3 bg-brand-500/5 border border-brand-500/10 rounded-xl flex justify-between items-center">
+          <div>
+            <div className="text-[10px] text-gray-500 uppercase font-semibold">Average Monthly Income</div>
+            <p className="text-[10px] text-gray-600 leading-normal mt-0.5">Assumes balanced yearly payouts.</p>
+          </div>
+          <span className="text-base font-bold font-mono text-brand-400">₹{Math.round(monthlyAvg).toLocaleString('en-IN')}</span>
+        </div>
+
+        <div className="space-y-2 pt-1">
+          <div className="text-[10px] text-gray-500 font-semibold uppercase tracking-wider">Seasonality Forecast</div>
+          <div className="flex items-end justify-between h-16 pt-2 px-1 bg-white/[0.01] rounded-xl border border-white/5">
+            {monthlyData.map((m, idx) => {
+              const maxAmt = Math.max(...monthlyData.map(d => d.amount))
+              const heightPct = maxAmt > 0 ? (m.amount / maxAmt) * 100 : 0
+              
+              return (
+                <div key={idx} className="flex flex-col items-center flex-1 group relative">
+                  <div className="absolute bottom-full mb-1 hidden group-hover:block z-50 bg-[#0e1420] border border-white/10 rounded-lg p-1.5 text-[9px] font-mono text-white whitespace-nowrap shadow-xl">
+                    ₹{m.amount.toLocaleString('en-IN')}
+                  </div>
+                  <div 
+                    className="w-2.5 bg-brand-500/30 group-hover:bg-brand-500 rounded-t transition-all duration-300"
+                    style={{ height: `${Math.max(5, heightPct)}%` }}
+                  />
+                  <span className="text-[8px] text-gray-600 font-semibold mt-1.5">{m.name}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function getHeadlineSentiment(title: string): { label: string; colorClass: string } {
+  const t = title.toLowerCase()
+  const posWords = ['surge', 'rise', 'growth', 'gain', 'profit', 'up', 'higher', 'positive', 'strong', 'upgrade', 'jump', 'buy', 'win', 'beat', 'exceptional', 'high']
+  const negWords = ['drop', 'fall', 'loss', 'down', 'lower', 'negative', 'weak', 'downgrade', 'slump', 'decline', 'sell', 'caution', 'warn', 'debt', 'risk']
+  
+  let posCount = 0
+  let negCount = 0
+  
+  posWords.forEach(w => { if (t.includes(w)) posCount++ })
+  negWords.forEach(w => { if (t.includes(w)) negCount++ })
+  
+  if (posCount > negCount) {
+    return { label: 'Bullish', colorClass: 'bg-brand-500/10 text-brand-400 border-brand-500/15' }
+  } else if (negCount > posCount) {
+    return { label: 'Bearish', colorClass: 'bg-red-500/10 text-red-400 border-red-500/15' }
+  }
+  return { label: 'Neutral', colorClass: 'bg-white/5 text-gray-400 border-white/5' }
+}
+
+function ActiveAlertsCard({ 
+  alerts, 
+  loading, 
+  onToggle, 
+  onDelete 
+}: { 
+  alerts: Alert[]; 
+  loading: boolean; 
+  onToggle: (id: string) => void; 
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <div className="card h-[460px] flex flex-col border-white/5 bg-white/[0.02] backdrop-blur-md">
+      <div className="flex items-center gap-2 mb-4 justify-between">
+        <h3 className="section-title text-white flex items-center gap-1.5">
+          <Activity size={14} className="text-brand-400" /> Active Price Alerts
+        </h3>
+        <Link href="/alerts" className="text-[10px] text-brand-400 font-semibold hover:underline">
+          Manage Alerts →
+        </Link>
+      </div>
+
+      {loading ? (
+        <div className="flex-1 space-y-2.5">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="skeleton h-14 rounded-xl" />
+          ))}
+        </div>
+      ) : alerts.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-gray-500">
+          <ShieldAlert size={24} className="text-gray-600 mb-2" />
+          <p className="text-xs font-semibold text-gray-400">No active alerts</p>
+          <p className="text-[10px] text-gray-600 leading-normal mt-0.5">Set up target or stop-loss price thresholds to notify your Telegram channel.</p>
+        </div>
+      ) : (
+        <div className="flex-1 space-y-2.5 overflow-y-auto pr-1 no-scrollbar max-h-[380px]">
+          {alerts.map(alert => (
+            <div key={alert.id} className="p-3 rounded-xl bg-white/[0.01] hover:bg-white/[0.03] border border-white/5 transition-all flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-white text-xs">{alert.ticker}</span>
+                  <span className="badge-gray text-[8px] uppercase tracking-wider">{alert.exchange}</span>
+                </div>
+                <div className="flex gap-2 text-[10px] text-gray-500 font-mono mt-1">
+                  {alert.target_price && <span>Target: ₹{alert.target_price}</span>}
+                  {alert.stop_loss && <span>SL: ₹{alert.stop_loss}</span>}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => onToggle(alert.id)}
+                  className={`relative inline-flex h-4 w-7 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    alert.is_active ? 'bg-brand-500' : 'bg-white/10'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      alert.is_active ? 'translate-x-3' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+
+                <button
+                  onClick={() => onDelete(alert.id)}
+                  className="text-gray-500 hover:text-red-400 p-1 hover:bg-red-500/10 rounded transition-colors"
+                  title="Delete Alert"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const { user, refreshUser } = useAuthStore()
   const [showAddModal, setShowAddModal] = useState(false)
@@ -344,6 +667,8 @@ export default function DashboardPage() {
   const [news, setNews] = useState<NewsArticle[]>([])
   const [performance, setPerformance] = useState<PortfolioPerformance | null>(null)
   const [loadingAnalytics, setLoadingAnalytics] = useState(true)
+  const [alerts, setAlerts] = useState<Alert[]>([])
+  const [loadingAlerts, setLoadingAlerts] = useState(true)
 
   const [donutGroup, setDonutGroup] = useState<'ticker' | 'sector'>('ticker')
 
@@ -379,20 +704,24 @@ export default function DashboardPage() {
   const fetchAnalytics = useCallback(async () => {
     try {
       setLoadingAnalytics(true)
+      setLoadingAlerts(true)
       const tickers = portfolio.map(p => p.ticker).join(',')
-      const [indicesRes, performanceRes, newsRes] = await Promise.all([
+      const [indicesRes, performanceRes, newsRes, alertsRes] = await Promise.all([
         stockApi.getIndices(),
         userApi.getPortfolioPerformance(),
-        stockApi.getNews(tickers)
+        stockApi.getNews(tickers),
+        alertApi.list()
       ])
       
       setIndices(indicesRes.data)
       setPerformance(performanceRes.data)
       setNews(newsRes.data)
+      setAlerts(alertsRes.data)
     } catch (err) {
       console.error("Failed to fetch dashboard analytics:", err)
     } finally {
       setLoadingAnalytics(false)
+      setLoadingAlerts(false)
     }
   }, [portfolio.length])
 
@@ -408,6 +737,26 @@ export default function DashboardPage() {
       toast.success(`${ticker} removed`)
       refreshUser()
     } catch { toast.error('Failed to remove') }
+  }
+
+  async function handleToggleAlert(id: string) {
+    try {
+      const { data } = await alertApi.toggle(id)
+      setAlerts(prev => prev.map(a => a.id === id ? { ...a, is_active: data.is_active } : a))
+      toast.success("Alert status updated")
+    } catch {
+      toast.error("Failed to toggle alert status")
+    }
+  }
+
+  async function handleDeleteAlert(id: string) {
+    try {
+      await alertApi.delete(id)
+      setAlerts(prev => prev.filter(a => a.id !== id))
+      toast.success("Alert deleted")
+    } catch {
+      toast.error("Failed to delete alert")
+    }
   }
 
   async function handleRefresh() {
@@ -597,8 +946,71 @@ export default function DashboardPage() {
             )}
           </div>
 
+          {/* Sector Drift & Rebalancing Analyzer */}
+          <SectorRebalancingCard portfolio={portfolio} />
+
           {/* Interactive Milestone Planner */}
           <GoalMilestonePlanner totalValue={totalCurrent} />
+
+          {/* Bottom Left Grid: News & Alerts */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Holdings & Market News with Sentiment Badging */}
+            <div className="card h-[460px] flex flex-col border-white/5 bg-white/[0.02] backdrop-blur-md">
+              <div className="flex items-center gap-2 mb-4">
+                <h3 className="section-title text-white flex-1"><Activity size={14} /> Holdings & Market News</h3>
+                <span className="badge-gray text-[9px] uppercase tracking-wider">Live RSS</span>
+              </div>
+              
+              {news.length === 0 ? (
+                <div className="flex-1 flex items-center justify-center text-center text-gray-500 py-12 text-xs">
+                  No recent headlines found.
+                </div>
+              ) : (
+                <div className="space-y-3 overflow-y-auto pr-1 max-h-[380px] no-scrollbar">
+                  {news.map((item, idx) => {
+                    const sentiment = getHeadlineSentiment(item.title)
+                    return (
+                      <a 
+                        key={idx} 
+                        href={item.link} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="block p-3 rounded-xl bg-white/[0.01] hover:bg-white/[0.04] border border-white/5 hover:border-white/10 transition-all duration-200 group"
+                      >
+                        <div className="flex justify-between items-start gap-2 mb-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="badge-green text-[9px] font-mono tracking-wider px-1.5 py-0.2 rounded uppercase shrink-0">
+                              {item.ticker}
+                            </span>
+                            <span className={`text-[8px] font-bold px-1.5 py-0.2 rounded border uppercase tracking-wider ${sentiment.colorClass}`}>
+                              {sentiment.label}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-gray-500 font-mono">
+                            {item.source}
+                          </span>
+                        </div>
+                        <h4 className="text-xs font-semibold text-gray-200 group-hover:text-white line-clamp-2 leading-relaxed">
+                          {item.title}
+                        </h4>
+                        <div className="text-[9px] text-gray-600 mt-2 text-right font-mono">
+                          {item.pub_date}
+                        </div>
+                      </a>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Active Alerts Card */}
+            <ActiveAlertsCard
+              alerts={alerts}
+              loading={loadingAlerts}
+              onToggle={handleToggleAlert}
+              onDelete={handleDeleteAlert}
+            />
+          </div>
         </div>
 
         {/* Right 1/3 sidebar area */}
@@ -633,6 +1045,12 @@ export default function DashboardPage() {
 
           {/* Tax Auditor Card */}
           <TaxAuditorCard portfolio={portfolio} />
+
+          {/* Dividend Forecaster Card */}
+          <DividendForecasterCard performance={performance} />
+
+          {/* Portfolio Range Predictor */}
+          <PortfolioRangePredictor totalValue={totalCurrent} performance={performance} />
 
           {/* Portfolio Audit Details */}
           {performance && portfolio.length > 0 && (
@@ -681,46 +1099,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* RSS News column */}
-          <div className="card h-fit flex flex-col border-white/5 bg-white/[0.02] backdrop-blur-md">
-            <div className="flex items-center gap-2 mb-4">
-              <h3 className="section-title text-white flex-1"><Activity size={14} /> Holdings & Market News</h3>
-              <span className="badge-gray text-[9px] uppercase tracking-wider">Live RSS</span>
-            </div>
-            
-            {news.length === 0 ? (
-              <div className="flex-1 flex items-center justify-center text-center text-gray-500 py-12 text-xs">
-                No recent headlines found.
-              </div>
-            ) : (
-              <div className="space-y-3 overflow-y-auto pr-1 max-h-[460px] no-scrollbar">
-                {news.map((item, idx) => (
-                  <a 
-                    key={idx} 
-                    href={item.link} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="block p-3 rounded-xl bg-white/[0.01] hover:bg-white/[0.04] border border-white/5 hover:border-white/10 transition-all duration-200 group"
-                  >
-                    <div className="flex justify-between items-start gap-2 mb-1.5">
-                      <span className="badge-green text-[9px] font-mono tracking-wider px-1.5 py-0.2 rounded uppercase shrink-0">
-                        {item.ticker}
-                      </span>
-                      <span className="text-[10px] text-gray-500 font-mono">
-                        {item.source}
-                      </span>
-                    </div>
-                    <h4 className="text-xs font-semibold text-gray-200 group-hover:text-white line-clamp-2 leading-relaxed">
-                      {item.title}
-                    </h4>
-                    <div className="text-[9px] text-gray-600 mt-2 text-right">
-                      {item.pub_date}
-                    </div>
-                  </a>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
