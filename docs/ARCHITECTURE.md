@@ -1,7 +1,6 @@
 # StockSentinel — Personalised Stock Intelligence Agent
 ## Complete Platform Architecture & Build Guide
 
----
 
 ## 1. What Your Scraper Does (Analysed)
 
@@ -18,44 +17,45 @@ Your existing `StockScrapper.py` (Apify actor):
 - Telegram bot with price-level alerts (buy/sell triggers)
 - Next.js 14 frontend: personalised dashboard per user
 
----
 
 ## 2. Full Stack Overview
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        NEXT.JS 14 FRONTEND                      │
-│  /app/(auth) → Login/Register                                   │
-│  /app/dashboard → Portfolio overview                            │
-│  /app/stock/[ticker] → Deep stock view                          │
-│  /app/alerts → Alert management                                 │
-└────────────────────────┬────────────────────────────────────────┘
-                         │ REST + WebSocket
-┌────────────────────────▼────────────────────────────────────────┐
-│                      FASTAPI BACKEND                            │
-│  /auth  → register, login, refresh (JWT)                        │
-│  /user  → portfolio CRUD                                        │
-│  /stock → fetch, cache, search                                  │
-│  /alert → create, delete, list, trigger                         │
-│  /ws    → WebSocket price feed                                  │
-└────┬───────────────┬──────────────────┬─────────────────────────┘
-     │               │                  │
-┌────▼────┐   ┌──────▼──────┐   ┌──────▼──────┐
-│ MongoDB │   │   Redis     │   │ Telegram    │
-│ Users   │   │ Stock Cache │   │ Bot (alerts)│
-│ Stocks  │   │ TTL 10 min  │   │             │
-│ Alerts  │   └─────────────┘   └─────────────┘
-│ Portfolio│
-└──────────┘
-     ▲
-┌────┴────────────────────────────────────────────────────────────┐
-│              YOUR SCRAPER (Apify Actor — unchanged)             │
-│  Runs Mon–Fri 9:30–15:30, every 10 min                         │
-│  Writes to MongoDB stocksentineldb.Stocks                            │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Frontend [Next.js 14 Web Application]
+        FE[User Interface App]
+        FE_D[Dashboard: Portfolio & Optimization]
+        FE_W[Watchlist: Live Technicals]
+        FE_S[Stock Deep Dive: Indicators]
+        FE_A[Alert Center]
+    end
+
+    subgraph Backend [FastAPI Application Server]
+        BE[API Router / JWT Auth]
+        BE_WS[WebSocket Price Broadcast]
+        BE_AC[Alert Check Worker]
+    end
+
+    subgraph Storage [Caching & Persistence Layer]
+        MG[(MongoDB Database)]
+        RD[(Redis Cache)]
+    end
+
+    subgraph External [Data & Notifications]
+        AP[Apify Scraper Actor]
+        TG((Telegram Bot API))
+    end
+
+    FE -->|REST API| BE
+    FE -->|WebSockets| BE_WS
+    BE -->|Read/Write User Portfolios| MG
+    BE -->|Cache Miss Cache Store| RD
+    BE_AC -->|Poll Prices| RD
+    BE_AC -->|Dispatch Notifications| TG
+    AP -->|Upsert Raw Stock Metrics| MG
+    MG -.->|Sync Read| RD
 ```
 
----
 
 ## 3. MongoDB Schema
 
@@ -129,7 +129,6 @@ Your existing `StockScrapper.py` (Apify actor):
 }
 ```
 
----
 
 ## 4. Backend: FastAPI
 
@@ -178,8 +177,6 @@ backend/
 | POST | /user/telegram | Link Telegram chat_id |
 | GET | /ws/prices | WebSocket live prices |
 
----
-
 ## 5. Redis Caching Strategy
 
 ```python
@@ -198,11 +195,42 @@ async def get_stock(ticker: str):
     return stock
 ```
 
----
 
 ## 6. Alert System
 
 ### Alert Checker (Background Task — runs every 60s)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Worker as Alert Checker Task
+    participant Redis as Redis Cache
+    participant DB as MongoDB
+    participant Bot as Telegram Bot Service
+    participant User as Telegram App
+
+    loop Every 60 Seconds
+        Worker->>DB: Query active alerts (is_active = true)
+        DB-->>Worker: Return list of active alerts
+        loop For each active alert
+            Worker->>Redis: Fetch cached current price for ticker
+            alt Cache Hit
+                Redis-->>Worker: Return price
+            else Cache Miss
+                Worker->>DB: Fetch price from DB
+                DB-->>Worker: Return price
+                Worker->>Redis: Cache price (TTL 10m)
+            end
+            
+            alt Current Price >= target_price OR Current Price <= stop_loss
+                Worker->>Bot: Trigger alert message dispatch
+                Bot->>User: Send DM notification
+                Worker->>DB: Update alert status (is_active = false, triggered_at = now)
+            end
+        end
+    end
+```
+
 ```python
 async def check_alerts():
     active_alerts = await db.alerts.find({"is_active": True}).to_list()
@@ -229,7 +257,6 @@ async def check_alerts():
             )
 ```
 
----
 
 ## 7. Telegram Bot
 
@@ -252,8 +279,6 @@ User visits StockSentinel Settings → clicks "Link Telegram"
 → Bot sends chat_id to /user/telegram endpoint
 → Account linked ✓
 ```
-
----
 
 ## 8. Next.js 14 Frontend
 
@@ -299,7 +324,6 @@ app/
 - Active alerts list
 - Triggered history
 
----
 
 ## 9. Environment Variables
 
@@ -320,7 +344,6 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_WS_URL=ws://localhost:8000
 ```
 
----
 
 ## 10. Deployment
 
@@ -355,7 +378,6 @@ services:
 - Redis → **Upstash** (serverless Redis, free tier)
 - Telegram Bot → same backend (webhook mode for production)
 
----
 
 ## 11. Build Order
 
@@ -371,15 +393,57 @@ services:
 10. ✅ **Alerts UI** — manage alerts
 11. ✅ **WebSocket** — live price updates
 
----
 
-## 12. Advanced Agent Features (Phase 2)
+## 12. Technical Indicators & Alert Scheduler
+
+### Technical Indicators
+The platform enriches base stock entries with technical signals:
+* **RSI (Relative Strength Index):** Computed over 14-day intervals to signal overbought (>70) or oversold (<30) conditions.
+* **SMA (Simple Moving Average):** A 50-day average price baseline to identify bullish/bearish trend breakouts.
+* **52-Week Range Percentile:** Traces position relative to high/low margins:
+  $$\text{Price Percentile} = \frac{\text{Current Price} - \text{Low}}{\text{High} - \text{Low}} \times 100$$
+
+### Alert Scheduler
+A periodic background worker runs in the FastAPI application:
+1. Every **60 seconds**, checks all active alerts in MongoDB.
+2. Compares alert target and stop-loss parameters with cached Redis price points.
+3. If breached, sends an instant Telegram notification via the linked Telegram Bot token and turns the alert inactive.
+
+## 13. Monte Carlo Path Forecaster & Sharpe Optimization
+
+### Sharpe Ratio Optimizer
+Calculates real-time risk-efficiency based on user expected CAGR (8%–25%) and portfolio volatility:
+$$\text{Sharpe Ratio} = \frac{\text{Expected CAGR} - \text{Risk Free Rate (5.0\%)}}{\text{Portfolio Volatility}}$$
+
+Ratings:
+* **Excellent ($\ge 1.0$):** High return relative to variance.
+* **Good ($\ge 0.5$ and $< 1.0$):** Balanced efficiency.
+* **Sub-optimal ($< 0.5$):** Rebalancing suggested.
+
+### 1-Year Monte Carlo Projections
+Simulates portfolio outcomes analytically using Geometric Brownian Motion:
+* **Optimistic Path (90th Percentile):**
+  $$S_{90} = S_0 \exp\left( (\mu - 0.5\sigma^2) + 1.2815\sigma \right)$$
+* **Median Path (50th Percentile):**
+  $$S_{50} = S_0 \exp\left( \mu - 0.5\sigma^2 \right)$$
+* **Pessimistic Path (10th Percentile):**
+  $$S_{10} = S_0 \exp\left( (\mu - 0.5\sigma^2) - 1.2815\sigma \right)$$
+*(where $S_0$ = portfolio value, $\mu$ = expected CAGR, $\sigma$ = portfolio volatility)*
+
+
+## 14. Holding-by-Holding Decision Matrix
+
+A rules-engine generates action recommendations (Hold / Buy / Trim) for every ticker:
+1. **Trim:** If weight $>30\%$ (concentration risk), or if P/E $>40$ with price percentile $>95\%$ (overvalued near peak).
+2. **Buy:** If P/E $<15$ with ROE/ROCE $>15\%$ (undervalued high-efficiency compounder), or if price percentile $<10\%$ with ROE/ROCE $>12\%$ (quality stock near bottom).
+3. **Hold:** Stable valuation and optimal position weight.
+
+
+## 15. Advanced Agent Features (Phase 2)
 
 Once core is live, extend with:
-
-- **AI Summary per stock** — call Claude API to generate "why this stock moved today" using the scraped data
-- **Portfolio health score** — diversification, risk analysis  
-- **Smart alerts** — "Alert me if ROCE drops below 15%", not just price
-- **Weekly digest** — Telegram bot sends Sunday portfolio summary
-- **Multi-exchange** — extend scraper to BSE tickers
-- **Paper trading mode** — simulate trades without real money
+* **AI Summary per stock** — call LLM to generate "why this stock moved today" using the scraped news and data.
+* **Smart alerts** — "Alert me if ROCE drops below 15%", not just price thresholds.
+* **Weekly digest** — Telegram bot sends Sunday portfolio summary and performance metrics.
+* **Multi-exchange** — extend scraper to BSE tickers.
+* **Paper trading mode** — simulate trades without real money.
