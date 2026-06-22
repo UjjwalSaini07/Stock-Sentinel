@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Eye, Bell, LogOut, TrendingUp, ChevronRight, Search } from 'lucide-react'
+import { LayoutDashboard, Eye, Bell, LogOut, TrendingUp, ChevronRight, Search, Bot } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import { useState } from 'react'
 import StockSearch from '@/components/stock/StockSearch'
@@ -10,6 +10,7 @@ const NAV = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, desc: 'Portfolio overview' },
   { href: '/watchlist', label: 'Watchlist', icon: Eye, desc: 'Track stocks' },
   { href: '/alerts', label: 'Alerts', icon: Bell, desc: 'Price notifications' },
+  { href: '/copilot', label: 'AI Copilot', icon: Bot, desc: 'AI assistant' },
 ]
 
 export default function Sidebar() {

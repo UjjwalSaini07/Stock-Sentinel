@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.database import connect_db, close_db
-from app.routers import auth, portfolio, stock, alerts, websocket
+from app.routers import auth, portfolio, stock, alerts, websocket, copilot
 from app.tasks.alert_checker import start_alert_checker
 import asyncio
 
@@ -28,6 +28,7 @@ app.include_router(portfolio.router, prefix="/user", tags=["portfolio"])
 app.include_router(stock.router, prefix="/stock", tags=["stock"])
 app.include_router(alerts.router, prefix="/alerts", tags=["alerts"])
 app.include_router(websocket.router, prefix="/ws", tags=["websocket"])
+app.include_router(copilot.router, prefix="/copilot", tags=["copilot"])
 
 @app.get("/health")
 async def health():
