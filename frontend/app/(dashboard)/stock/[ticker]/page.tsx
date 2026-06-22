@@ -791,13 +791,15 @@ export default function StockDetailPage() {
 
       {/* Tabs: Fundamentals / Forecast / Alert */}
       <div className="card">
-        <div className="flex gap-1 p-1 bg-surface-muted rounded-xl w-fit mb-5">
+        <div className="flex gap-1.5 p-1.5 bg-black/60 border border-white/[0.04] rounded-2xl w-fit mb-5 backdrop-blur-md">
           {(['fundamentals', 'forecast', 'alert'] as const).map(t => (
             <button
               key={t}
               onClick={() => setActiveTab(t)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all ${
-                activeTab === t ? 'bg-surface-card text-white shadow-sm' : 'text-gray-500 hover:text-white'
+              className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-150 border ${
+                activeTab === t
+                  ? 'bg-brand-500/10 text-brand-400 border-brand-500/25 shadow-[0_0_15px_rgba(38,163,102,0.06)]'
+                  : 'text-gray-400 hover:text-white hover:bg-white/[0.02] border-transparent'
               }`}
             >
               {t === 'alert' ? '🔔 Set Alert' : t === 'forecast' ? '🔮 AI Forecast' : '📊 Fundamentals'}

@@ -60,7 +60,12 @@ async def get_stock_analysis(ticker: str) -> dict:
             if last_updated:
                 # If cached in DB, format and cache in Redis
                 if isinstance(last_updated, str):
-                    last_updated = datetime.fromisoformat(last_updated)
+                    try:
+                        last_updated = datetime.fromisoformat(last_updated)
+                    except ValueError:
+                        last_updated = datetime.min.replace(tzinfo=timezone.utc)
+                if last_updated.tzinfo is None:
+                    last_updated = last_updated.replace(tzinfo=timezone.utc)
                 now = datetime.now(timezone.utc)
                 # If less than 4 hours old, reuse it
                 if (now - last_updated).total_seconds() < 14400:
