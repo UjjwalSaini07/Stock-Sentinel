@@ -3,8 +3,13 @@ import './globals.css'
 import { Toaster } from 'react-hot-toast'
 
 export const metadata: Metadata = {
-  title: 'StockSentinel — Stock Intelligence',
+  title: 'StockSentinel: Stock Intelligence',
   description: 'Track, analyse, and get alerted on your Indian stock portfolio.',
+  icons: {
+    icon: '/mainLogo2Style.png',
+    shortcut: '/mainLogo2Style.png',
+    apple: '/mainLogo2Style.png',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -12,6 +17,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="dark">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
       </head>
