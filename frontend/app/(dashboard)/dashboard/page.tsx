@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Wallet, TrendingUp, TrendingDown, BarChart2, RefreshCw, ArrowUpRight, Activity, Info, ShieldAlert, Trash2 } from 'lucide-react'
+import { Plus, Wallet, TrendingUp, TrendingDown, BarChart2, RefreshCw, ArrowUpRight, Activity, Info, ShieldAlert, Trash2, Sun, Moon } from 'lucide-react'
 import Link from 'next/link'
 import { useAuthStore } from '@/lib/store'
 import StatCard from '@/components/ui/StatCard'
@@ -1171,18 +1171,42 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5 animate-fade-in pb-12">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-gray-500 text-sm mb-0.5">{greeting()},</p>
-          <h1 className="text-2xl font-bold">{user?.name?.split(' ')[0]} 👋</h1>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gradient-to-r from-white/[0.02] to-transparent p-5 rounded-2xl border border-white/[0.04] backdrop-blur-md shadow-2xl relative overflow-hidden group">
+        <div className="absolute inset-0 bg-gradient-to-r from-brand-500/5 to-transparent opacity-50 pointer-events-none" />
+        <div className="flex items-center gap-4 relative z-10">
+          {/* Dynamic Greeting Icon Box */}
+          <div className="w-12 h-12 rounded-2xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-center shadow-inner relative group-hover:border-white/10 transition-colors duration-300">
+            {new Date().getHours() < 12 ? (
+              <Sun className="w-5.5 h-5.5 text-amber-400 animate-pulse" />
+            ) : new Date().getHours() < 17 ? (
+              <Sun className="w-5.5 h-5.5 text-orange-400 animate-pulse" />
+            ) : (
+              <Moon className="w-5 h-5 text-indigo-300 animate-pulse" />
+            )}
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{greeting()}</span>
+              <span className="w-1 h-1 rounded-full bg-brand-500/60" />
+              <span className="text-[10px] text-gray-500 font-mono">
+                {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+              </span>
+            </div>
+            <h1 className="text-2xl font-extrabold tracking-tight mt-0.5 flex items-center gap-2">
+              <span className="bg-gradient-to-r from-white via-gray-100 to-gray-400 bg-clip-text text-transparent">
+                {user?.name?.split(' ')[0]}
+              </span>
+              <span className="inline-block origin-bottom-right duration-1000">👋</span>
+            </h1>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={handleRefresh} disabled={refreshing} className="btn-outline flex items-center gap-2 text-sm bg-white/[0.01]">
-            <RefreshCw size={14} className={refreshing ? 'animate-spin text-brand-400' : ''} />
+        <div className="flex items-center gap-2 relative z-10">
+          <button onClick={handleRefresh} disabled={refreshing} className="btn-outline flex items-center gap-2 text-xs bg-white/[0.01] hover:bg-white/[0.04] border-white/5 hover:border-white/10 py-2.5 px-4 transition-all duration-300 rounded-xl">
+            <RefreshCw size={13} className={refreshing ? 'animate-spin text-brand-400' : ''} />
             Refresh
           </button>
-          <button onClick={() => setShowAddModal(true)} className="btn-primary flex items-center gap-2 text-sm">
-            <Plus size={16} /> Add Stock
+          <button onClick={() => setShowAddModal(true)} className="btn-primary flex items-center gap-2 text-xs py-2.5 px-4 rounded-xl shadow-[0_0_20px_rgba(38,163,102,0.12)] hover:shadow-[0_0_25px_rgba(38,163,102,0.22)] transition-all duration-300">
+            <Plus size={14} /> Add Stock
           </button>
         </div>
       </div>

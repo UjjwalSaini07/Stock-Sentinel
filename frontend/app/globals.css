@@ -169,3 +169,8 @@
   0%, 100% { box-shadow: 0 0 0 0 rgba(38,163,102,0.5); }
   50% { box-shadow: 0 0 0 6px rgba(38,163,102,0); }
 }
+
+@keyframes scan-progress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(150%); }
+}
