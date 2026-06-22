@@ -26,13 +26,11 @@ export default function Sidebar() {
   const initials = user?.name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || '??'
 
   return (
-    <aside className="w-[240px] h-screen bg-surface-card border-r border-surface-border flex flex-col fixed left-0 top-0 z-40">
+    <aside className="w-[240px] h-screen bg-surface-card/65 backdrop-blur-xl border-r border-surface-border/50 flex flex-col fixed left-0 top-0 z-40">
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-surface-border">
+      <div className="px-5 py-5 border-b border-surface-border/40">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-glow-brand shrink-0">
-            <TrendingUp size={15} className="text-white" />
-          </div>
+          <img src="/mainLogo2Style.png" alt="StockSentinel Logo" className="w-8 h-8 object-contain shrink-0" />
           <div>
             <span className="font-bold text-base tracking-tight">StockSentinel</span>
             <div className="flex items-center gap-1 mt-0.5">
@@ -44,14 +42,14 @@ export default function Sidebar() {
       </div>
 
       {/* Quick search */}
-      <div className="px-3 py-3 border-b border-surface-border">
+      <div className="px-3 py-3 border-b border-surface-border/40">
         <button
           onClick={() => setShowSearch(!showSearch)}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg bg-surface-muted hover:bg-surface-hover text-gray-500 hover:text-white transition-all text-sm"
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg bg-surface-muted hover:bg-surface-hover text-gray-500 hover:text-white transition-all text-sm border border-white/[0.03]"
         >
           <Search size={14} />
           <span className="flex-1 text-left">Quick search…</span>
-          <kbd className="text-[10px] bg-surface-border px-1.5 py-0.5 rounded font-mono">/</kbd>
+          <kbd className="text-[10px] bg-surface-border px-1.5 py-0.5 rounded font-mono border border-white/5">/</kbd>
         </button>
         {showSearch && (
           <div className="mt-2">
@@ -69,14 +67,14 @@ export default function Sidebar() {
             <Link
               key={href}
               href={href}
-              className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 relative ${
+              className={`group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 relative border border-transparent ${
                 active
-                  ? 'bg-brand-500/12 text-brand-400'
+                  ? 'bg-gradient-to-r from-brand-500/10 to-transparent text-brand-400 border-brand-500/20 shadow-[0_0_15px_rgba(38,163,102,0.04)]'
                   : 'text-gray-400 hover:bg-surface-muted hover:text-white'
               }`}
             >
               {active && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-brand-500 rounded-full" />
+                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-brand-500 rounded-full shadow-[0_0_8px_rgba(38,163,102,0.8)]" />
               )}
               <Icon size={17} className={active ? 'text-brand-400' : ''} />
               <span className="flex-1">{label}</span>

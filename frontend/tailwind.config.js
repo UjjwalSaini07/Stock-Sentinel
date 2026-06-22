@@ -22,11 +22,11 @@ module.exports = {
           950: '#09261a',
         },
         surface: {
-          DEFAULT: '#080c12',
-          card:    '#0e1420',
-          border:  '#182030',
-          muted:   '#1a2235',
-          hover:   '#1f293d',
+          DEFAULT: '#000000',
+          card:    '#050507',
+          border:  '#121214',
+          muted:   '#08080a',
+          hover:   '#161619',
         },
         accent: {
           blue:   '#3b82f6',
@@ -40,10 +40,10 @@ module.exports = {
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       boxShadow: {
-        'card': '0 0 0 1px rgba(24,32,48,1), 0 4px 16px rgba(0,0,0,0.4)',
-        'card-hover': '0 0 0 1px rgba(38,163,102,0.3), 0 8px 32px rgba(0,0,0,0.5)',
-        'glow-brand': '0 0 24px rgba(38,163,102,0.2)',
-        'glow-red': '0 0 24px rgba(239,68,68,0.2)',
+        'card': '0 0 0 1px rgba(255,255,255,0.06), 0 4px 16px rgba(0,0,0,0.6)',
+        'card-hover': '0 0 0 1px rgba(38,163,102,0.3), 0 8px 32px rgba(0,0,0,0.8), 0 0 16px rgba(38,163,102,0.1)',
+        'glow-brand': '0 0 24px rgba(38,163,102,0.15)',
+        'glow-red': '0 0 24px rgba(239,68,68,0.15)',
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',
