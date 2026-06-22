@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     TELEGRAM_CHAT_ID: str = ""
     FRONTEND_URL: str = "http://localhost:3000"
     ALERT_CHECK_INTERVAL: int = 60  # seconds
+    GROQ_API_KEY: str = ""
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

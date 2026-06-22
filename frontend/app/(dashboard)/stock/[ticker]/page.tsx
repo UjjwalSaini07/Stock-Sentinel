@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
+  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts'
 import { stockApi, userApi } from '@/lib/api'
 import { useAuthStore } from '@/lib/store'
@@ -158,6 +158,277 @@ function PredictiveWidget({ predictions, currentPrice }: { predictions: any; cur
   )
 }
 
+function ForecastTab({
+  analysis,
+  loading,
+  error,
+  onRefresh
+}: {
+  analysis: any
+  loading: boolean
+  error: string
+  onRefresh: () => void
+}) {
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-3">
+        <RefreshCw className="animate-spin text-brand-400" size={28} />
+        <p className="text-gray-500 text-sm">Groq AI is assembling files, financial tables, news catalysts, and formulating predictions...</p>
+      </div>
+    )
+  }
+
+  if (error || !analysis) {
+    return (
+      <div className="text-center py-10 space-y-4">
+        <p className="text-red-400 text-sm">Failed to generate AI analysis: {error || 'No forecast data'}</p>
+        <button onClick={onRefresh} className="btn-outline text-xs flex items-center gap-1.5 mx-auto">
+          <RefreshCw size={12} /> Retry Analysis
+        </button>
+      </div>
+    )
+  }
+
+  const riskBadgeColor = (val: string) => {
+    const v = val?.toLowerCase() || '';
+    if (['high', 'weak', 'poor', 'low'].some(k => v.includes(k))) {
+      if (v.includes('low') && (v.includes('confidence') || v.includes('quality') || v.includes('visibility'))) return 'bg-red-500/10 text-red-400 border border-red-500/20';
+      if (v.includes('high') && v.includes('risk')) return 'bg-red-500/10 text-red-400 border border-red-500/20';
+      if (v.includes('weak') || v.includes('poor')) return 'bg-red-500/10 text-red-400 border border-red-500/20';
+    }
+    if (['strong', 'very high', 'good', 'high'].some(k => v.includes(k))) {
+      if (v.includes('high') && v.includes('risk')) return 'bg-red-500/10 text-red-400 border border-red-500/20';
+      return 'bg-brand-500/10 text-brand-400 border border-brand-500/20';
+    }
+    return 'bg-amber-500/10 text-amber-400 border border-amber-500/20';
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Overview Card */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl bg-white/[0.02] border border-white/5">
+        <div>
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            {analysis.company_name || `${analysis.ticker} Ltd.`}
+            {analysis.asm_status && analysis.asm_status !== 'None' && (
+              <span className="text-[10px] px-2 py-0.5 font-bold uppercase rounded bg-red-500/10 text-red-400 border border-red-500/20 animate-pulse">
+                {analysis.asm_status}
+              </span>
+            )}
+          </h2>
+          <p className="text-xs text-gray-500 mt-1">
+            {analysis.sector} · {analysis.industry} · Forecast as of {new Date(analysis.last_analyzed || Date.now()).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+          </p>
+        </div>
+        <div className="flex items-center gap-6 text-right">
+          <div>
+            <div className="text-[10px] text-gray-500 font-semibold uppercase">Real-Time Price</div>
+            <div className="text-2xl font-bold font-mono text-white mt-0.5">₹{analysis.current_price?.toLocaleString('en-IN')}</div>
+          </div>
+          <div>
+            <div className="text-[10px] text-gray-500 font-semibold uppercase">1Y Return (YoY)</div>
+            <div className={`text-lg font-bold font-mono flex items-center gap-1 mt-0.5 ${analysis.yoy_change_pct >= 0 ? 'text-brand-400' : 'text-red-400'}`}>
+              {analysis.yoy_change_pct >= 0 ? '+' : ''}{analysis.yoy_change_pct?.toFixed(2)}%
+            </div>
+          </div>
+          <button onClick={onRefresh} className="btn-icon self-center shrink-0" title="Recalculate forecast">
+            <RefreshCw size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* Metric Tiles grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* ROCE */}
+        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 flex flex-col justify-between">
+          <div className="text-xs text-gray-500 font-medium">ROCE (FY26)</div>
+          <div className="text-xl font-bold text-white font-mono mt-2">{analysis.roce_current || '—'}</div>
+          <div className="text-[10px] text-gray-400 mt-1">vs {analysis.roce_previous || '—'} last year</div>
+        </div>
+        {/* ROE */}
+        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 flex flex-col justify-between">
+          <div className="text-xs text-gray-500 font-medium">ROE (FY26)</div>
+          <div className="text-xl font-bold text-white font-mono mt-2">{analysis.roe_current || '—'}</div>
+          <div className="text-[10px] text-gray-400 mt-1">3Y avg: {analysis.roe_avg_3y || '—'}</div>
+        </div>
+        {/* Net Profit */}
+        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 flex flex-col justify-between">
+          <div className="text-xs text-gray-500 font-medium">Net Profit</div>
+          <div className="text-xl font-bold text-white font-mono mt-2">{analysis.net_profit_current || '—'}</div>
+          <div className="text-[10px] text-gray-400 mt-1">{analysis.net_profit_label || 'vs last year'}: {analysis.net_profit_previous || '—'}</div>
+        </div>
+        {/* Revenue */}
+        <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 flex flex-col justify-between">
+          <div className="text-xs text-gray-500 font-medium">Revenue</div>
+          <div className="text-xl font-bold text-white font-mono mt-2">{analysis.revenue_current || '—'}</div>
+          <div className="text-[10px] text-gray-400 mt-1">{analysis.revenue_label || 'vs last year'}: {analysis.revenue_previous || '—'}</div>
+        </div>
+      </div>
+
+      {/* Chart Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Revenue Trend Chart */}
+        <div className="card">
+          <h3 className="text-sm font-semibold text-gray-400 mb-4">Revenue Trend (₹ Cr)</h3>
+          {analysis.revenue_trend_chart && analysis.revenue_trend_chart.length > 0 ? (
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={analysis.revenue_trend_chart} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#182030" />
+                <XAxis dataKey="year" tick={{ fill: '#4b5563', fontSize: 10 }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fill: '#4b5563', fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `₹${v}`} />
+                <Tooltip
+                  contentStyle={{ background: '#0e1420', border: '1px solid #182030', borderRadius: 8, fontSize: 12 }}
+                  formatter={(v: number) => [`₹${v} Cr`, 'Revenue']}
+                  labelStyle={{ color: '#9ca3af' }}
+                />
+                <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-40 flex items-center justify-center text-gray-600 text-sm">No revenue trend data available</div>
+          )}
+        </div>
+
+        {/* Quarterly Sales Chart */}
+        <div className="card">
+          <h3 className="text-sm font-semibold text-gray-400 mb-4">Quarterly Sales (₹ Cr)</h3>
+          {analysis.quarterly_sales_chart && analysis.quarterly_sales_chart.length > 0 ? (
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={analysis.quarterly_sales_chart} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#182030" />
+                <XAxis dataKey="quarter" tick={{ fill: '#4b5563', fontSize: 10 }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fill: '#4b5563', fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `₹${v}`} />
+                <Tooltip
+                  contentStyle={{ background: '#0e1420', border: '1px solid #182030', borderRadius: 8, fontSize: 12 }}
+                  formatter={(v: number) => [`₹${v} Cr`, 'Sales']}
+                  labelStyle={{ color: '#9ca3af' }}
+                />
+                <Bar dataKey="sales" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-40 flex items-center justify-center text-gray-600 text-sm">No quarterly sales data available</div>
+          )}
+        </div>
+      </div>
+
+      {/* Catalyst Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Bull Factors */}
+        <div className="card space-y-4">
+          <h3 className="text-sm font-bold text-brand-400 flex items-center gap-1.5">
+            <TrendingUp size={16} /> Bull Factors (Positive Catalyst)
+          </h3>
+          <div className="space-y-3">
+            {analysis.bull_factors && analysis.bull_factors.length > 0 ? (
+              analysis.bull_factors.map((bf: any, i: number) => (
+                <div key={i} className="flex justify-between items-start gap-4 p-3 rounded-xl bg-brand-500/[0.02] border border-brand-500/5 hover:border-brand-500/10 transition-colors">
+                  <p className="text-xs text-gray-300 leading-relaxed">{bf.factor}</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase shrink-0 ${
+                    bf.badge_type === 'success' ? 'bg-brand-500/10 text-brand-400 border border-brand-500/20' :
+                    bf.badge_type === 'warning' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                    'bg-sky-500/10 text-sky-400 border border-sky-500/20'
+                  }`}>
+                    {bf.status}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="text-xs text-gray-600">No positive factors identified</p>
+            )}
+          </div>
+        </div>
+
+        {/* Bear Factors */}
+        <div className="card space-y-4">
+          <h3 className="text-sm font-bold text-red-400 flex items-center gap-1.5">
+            <TrendingDown size={16} /> Bear / Risk Factors (Caution)
+          </h3>
+          <div className="space-y-3">
+            {analysis.bear_factors && analysis.bear_factors.length > 0 ? (
+              analysis.bear_factors.map((bf: any, i: number) => (
+                <div key={i} className="flex justify-between items-start gap-4 p-3 rounded-xl bg-red-500/[0.01] border border-red-500/5 hover:border-red-500/10 transition-colors">
+                  <p className="text-xs text-gray-300 leading-relaxed">{bf.factor}</p>
+                  <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase shrink-0 ${
+                    bf.badge_type === 'danger' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                    bf.badge_type === 'warning' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                    'bg-slate-500/10 text-gray-300 border border-slate-500/10'
+                  }`}>
+                    {bf.type}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="text-xs text-gray-600">No risk factors identified</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Risk Scorecard */}
+      <div className="card">
+        <h3 className="text-sm font-bold text-white mb-4">AI Risk & Quality Scorecard</h3>
+        {analysis.risk_scorecard ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
+            {Object.entries(analysis.risk_scorecard).map(([key, val]: any) => (
+              <div key={key} className="flex items-center justify-between py-1.5 border-b border-white/5">
+                <span className="text-xs text-gray-400 capitalize">{key.replace(/_/g, ' ')}</span>
+                <span className={`text-[10px] px-2 py-0.5 font-bold uppercase rounded ${riskBadgeColor(val)}`}>
+                  {val}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-gray-600">No scorecard available</p>
+        )}
+      </div>
+
+      {/* 1-Month Price Outlook */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-bold text-white">1-Month Price Outlook ({new Date(Date.now() + 30 * 24 * 3600 * 1000).toLocaleString('en-IN', { month: 'long', year: 'numeric' })})</h3>
+        {analysis.price_outlook ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Bear Case */}
+            <div className="p-4 rounded-2xl bg-red-500/[0.02] border border-red-500/5 hover:border-red-500/10 transition-colors space-y-2">
+              <div className="text-xs text-red-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <TrendingDown size={14} /> Bear Case
+              </div>
+              <div className="text-xl font-bold font-mono text-white mt-1">{analysis.price_outlook.bear_case?.range || '—'}</div>
+              <p className="text-xs text-gray-400 leading-relaxed mt-1">{analysis.price_outlook.bear_case?.reason || '—'}</p>
+            </div>
+
+            {/* Base Case */}
+            <div className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-white/10 transition-colors space-y-2">
+              <div className="text-xs text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <Activity size={14} /> Base Case
+              </div>
+              <div className="text-xl font-bold font-mono text-white mt-1">{analysis.price_outlook.base_case?.range || '—'}</div>
+              <p className="text-xs text-gray-400 leading-relaxed mt-1">{analysis.price_outlook.base_case?.reason || '—'}</p>
+            </div>
+
+            {/* Bull Case */}
+            <div className="p-4 rounded-2xl bg-brand-500/[0.02] border border-brand-500/5 hover:border-brand-500/10 transition-colors space-y-2">
+              <div className="text-xs text-brand-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                <TrendingUp size={14} /> Bull Case
+              </div>
+              <div className="text-xl font-bold font-mono text-white mt-1">{analysis.price_outlook.bull_case?.range || '—'}</div>
+              <p className="text-xs text-gray-400 leading-relaxed mt-1">{analysis.price_outlook.bull_case?.reason || '—'}</p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-xs text-gray-600">No outlook targets available</p>
+        )}
+      </div>
+
+      {/* Disclaimer */}
+      <p className="text-[10px] text-gray-600 text-center italic mt-4">
+        Not financial advice. Based on public data, fundamentals and recent corporate events only.
+      </p>
+    </div>
+  )
+}
+
 export default function StockDetailPage() {
   const { ticker } = useParams<{ ticker: string }>()
   const router = useRouter()
@@ -167,8 +438,31 @@ export default function StockDetailPage() {
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
-  const [activeTab, setActiveTab] = useState<'fundamentals' | 'alert'>('fundamentals')
+  const [activeTab, setActiveTab] = useState<'fundamentals' | 'forecast' | 'alert'>('fundamentals')
   const [sparkData, setSparkData] = useState<any[]>([])
+
+  const [analysis, setAnalysis] = useState<any | null>(null)
+  const [loadingAnalysis, setLoadingAnalysis] = useState(false)
+  const [analysisError, setAnalysisError] = useState('')
+
+  const fetchAnalysis = useCallback(async () => {
+    try {
+      setLoadingAnalysis(true)
+      setAnalysisError('')
+      const res = await stockApi.getAnalysis(ticker)
+      setAnalysis(res.data)
+    } catch (err: any) {
+      setAnalysisError(err?.response?.data?.detail || 'Failed to generate forecast')
+    } finally {
+      setLoadingAnalysis(false)
+    }
+  }, [ticker])
+
+  useEffect(() => {
+    if (activeTab === 'forecast' && !analysis && !loadingAnalysis) {
+      fetchAnalysis()
+    }
+  }, [activeTab, analysis, loadingAnalysis, fetchAnalysis])
 
   const holding = user?.portfolio?.find(p => p.ticker === ticker?.toUpperCase())
   const isWatched = user?.watchlist?.includes(ticker?.toUpperCase())
@@ -495,10 +789,10 @@ export default function StockDetailPage() {
         </div>
       )}
 
-      {/* Tabs: Fundamentals / Alert */}
+      {/* Tabs: Fundamentals / Forecast / Alert */}
       <div className="card">
         <div className="flex gap-1 p-1 bg-surface-muted rounded-xl w-fit mb-5">
-          {(['fundamentals', 'alert'] as const).map(t => (
+          {(['fundamentals', 'forecast', 'alert'] as const).map(t => (
             <button
               key={t}
               onClick={() => setActiveTab(t)}
@@ -506,7 +800,7 @@ export default function StockDetailPage() {
                 activeTab === t ? 'bg-surface-card text-white shadow-sm' : 'text-gray-500 hover:text-white'
               }`}
             >
-              {t === 'alert' ? '🔔 Set Alert' : '📊 Fundamentals'}
+              {t === 'alert' ? '🔔 Set Alert' : t === 'forecast' ? '🔮 AI Forecast' : '📊 Fundamentals'}
             </button>
           ))}
         </div>
@@ -522,6 +816,13 @@ export default function StockDetailPage() {
             <MetricTile label="52W High" value={stock.high ? `₹${stock.high.toLocaleString('en-IN')}` : null} />
             <MetricTile label="52W Low" value={stock.low ? `₹${stock.low.toLocaleString('en-IN')}` : null} />
           </div>
+        ) : activeTab === 'forecast' ? (
+          <ForecastTab
+            analysis={analysis}
+            loading={loadingAnalysis}
+            error={analysisError}
+            onRefresh={fetchAnalysis}
+          />
         ) : (
           <SetAlertForm ticker={stock.ticker} currentPrice={stock.current_price} onCreated={() => {}} />
         )}

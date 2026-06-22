@@ -281,3 +281,207 @@ async def scrape_stock(ticker: str, exchange: str = "NSE") -> Optional[dict]:
     serializable_data = {**stock_data}
     serializable_data["last_updated"] = serializable_data["last_updated"].isoformat()
     return serializable_data
+
+
+async def get_yoy_change(ticker: str) -> Optional[float]:
+    """Fetches YoY price change percentage using Yahoo Finance daily history for the past 1 year."""
+    yf_ticker = ticker if "." in ticker else f"{ticker}.NS"
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_ticker}?range=1y&interval=1wk"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    try:
+        async with httpx.AsyncClient(headers=headers, timeout=6.0) as client:
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                data = resp.json()
+                chart = data.get("chart", {})
+                result = chart.get("result", [])
+                if result:
+                    indicators = result[0].get("indicators", {})
+                    quote = indicators.get("quote", [{}])[0]
+                    close_prices = [p for p in quote.get("close", []) if p is not None]
+                    if close_prices and len(close_prices) > 2:
+                        price_1y_ago = close_prices[0]
+                        current_price = close_prices[-1]
+                        yoy_change = ((current_price - price_1y_ago) / price_1y_ago) * 100
+                        return round(yoy_change, 2)
+    except Exception as e:
+        logger.error(f"Error calculating YoY change for {ticker}: {e}")
+    return None
+
+
+async def scrape_extended_stock_data(ticker: str, exchange: str = "NSE") -> dict:
+    """
+    Scrapes a highly detailed set of fundamental data from Screener.in
+    including Quarterly table, Profit & Loss (Annual) table, Shareholding Pattern,
+    Pros and Cons, and Warnings.
+    Also returns real-time price and YoY performance.
+    """
+    ticker = ticker.upper()
+    exchange = exchange.upper()
+    
+    screener_url = f"https://www.screener.in/company/{ticker}/"
+    google_url = f"https://www.google.com/finance/quote/{ticker}:{exchange}"
+    
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+    
+    logger.info(f"[Scraper] Scraping extended data for {ticker}...")
+    
+    screener_html = None
+    google_html = None
+    async with httpx.AsyncClient(headers=headers, follow_redirects=True, timeout=12.0) as client:
+        try:
+            resp = await client.get(screener_url)
+            if resp.status_code == 200:
+                screener_html = resp.text
+            else:
+                logger.warning(f"Screener.in status {resp.status_code} for {ticker}")
+        except Exception as e:
+            logger.error(f"Screener.in request error for {ticker}: {e}")
+            
+        try:
+            resp = await client.get(google_url)
+            if resp.status_code == 200:
+                google_html = resp.text
+        except Exception as e:
+            logger.error(f"Google Finance request error for {ticker}:{exchange}: {e}")
+
+    current_price = None
+    previous_close = None
+    
+    def parse_numeric(value: Optional[str]) -> Optional[float]:
+        if not value:
+            return None
+        try:
+            clean_val = value.replace(",", "").replace("₹", "").replace("%", "").strip()
+            return float(clean_val)
+        except ValueError:
+            return None
+
+    if google_html:
+        try:
+            google_soup = BeautifulSoup(google_html, "html.parser")
+            price_element = google_soup.select_one("div.YMlKec.fxKbKc")
+            if price_element:
+                current_price = parse_numeric(price_element.text)
+            prev_close_element = google_soup.select_one("div.gyFHrc div.P6K39c")
+            if prev_close_element:
+                previous_close = parse_numeric(prev_close_element.text)
+        except Exception as e:
+            logger.error(f"Error parsing Google Finance for {ticker}: {e}")
+
+    result = {
+        "ticker": ticker,
+        "exchange": exchange,
+        "current_price": current_price,
+        "previous_close": previous_close,
+        "fundamentals": {},
+        "quarterly_results": None,
+        "profit_loss": None,
+        "shareholding_pattern": None,
+        "pros": [],
+        "cons": [],
+        "warnings": [],
+        "yoy_change_pct": None
+    }
+    
+    if screener_html:
+        try:
+            soup = BeautifulSoup(screener_html, "html.parser")
+            
+            def get_text(selector: str) -> Optional[str]:
+                element = soup.select_one(selector)
+                return element.text.strip() if element else None
+
+            result["fundamentals"] = {
+                "market_cap": parse_numeric(get_text("li:-soup-contains('Market Cap') .number")),
+                "price": parse_numeric(get_text("li:-soup-contains('Current Price') .number")),
+                "pe": parse_numeric(get_text("li:-soup-contains('Stock P/E') .number")),
+                "dividend_yield": parse_numeric(get_text("li:-soup-contains('Dividend Yield') .number")),
+                "roce": parse_numeric(get_text("li:-soup-contains('ROCE') .number")),
+                "roe": parse_numeric(get_text("li:-soup-contains('ROE') .number")),
+                "face_value": parse_numeric(get_text("li:-soup-contains('Face Value') .number")),
+                "debt_equity": parse_numeric(get_text("li:-soup-contains('Debt to Equity') .number")),
+            }
+            
+            high_low = get_text("li:-soup-contains('High / Low') .nowrap.value")
+            if high_low and " / " in high_low:
+                parts = high_low.split(" / ")
+                if len(parts) == 2:
+                    result["fundamentals"]["high"] = parse_numeric(parts[0])
+                    result["fundamentals"]["low"] = parse_numeric(parts[1])
+            
+            peers_section = soup.select_one("#peers")
+            if peers_section:
+                market_links = peers_section.find_all("a", href=lambda h: h and h.startswith("/market/"))
+                if market_links:
+                    result["sector"] = market_links[0].text.strip()
+                    result["industry"] = market_links[-1].text.strip()
+                    
+            def parse_table(section_id) -> Optional[dict]:
+                section = soup.find(id=section_id)
+                if not section:
+                    section = soup.select_one(f"section#{section_id}")
+                if not section:
+                    return None
+                table = section.find("table")
+                if not table:
+                    return None
+                
+                headers = []
+                thead = table.find("thead")
+                if thead:
+                    headers = [th.text.strip() for th in thead.find_all("th") if th.text.strip()]
+                
+                rows = []
+                tbody = table.find("tbody")
+                if tbody:
+                    for tr in tbody.find_all("tr"):
+                        tds = tr.find_all("td")
+                        if not tds:
+                            continue
+                        row_name = tds[0].text.strip().replace("\n", "").replace(" +", "").replace("+", "").strip()
+                        row_values = []
+                        for td in tds[1:]:
+                            val_text = td.text.strip().replace(",", "").replace("%", "")
+                            row_values.append(val_text)
+                        rows.append({
+                            "metric": row_name,
+                            "values": row_values
+                        })
+                return {"headers": headers, "rows": rows}
+
+            result["quarterly_results"] = parse_table("quarters")
+            result["profit_loss"] = parse_table("profit-loss")
+            result["shareholding_pattern"] = parse_table("shareholding")
+            
+            analysis_section = soup.find(id="analysis")
+            if analysis_section:
+                pros_div = analysis_section.find(class_="pros")
+                if pros_div:
+                    result["pros"] = [li.text.strip() for li in pros_div.find_all("li")]
+                cons_div = analysis_section.find(class_="cons")
+                if cons_div:
+                    result["cons"] = [li.text.strip() for li in cons_div.find_all("li")]
+                    
+            warning_divs = soup.select(".company-warning, .warning, .alert")
+            for div in warning_divs:
+                txt = div.text.strip()
+                if txt and txt not in result["warnings"]:
+                    clean_txt = " ".join(txt.split())
+                    result["warnings"].append(clean_txt)
+                    
+        except Exception as e:
+            logger.error(f"Error parsing Screener extended data for {ticker}: {e}")
+
+    if result["current_price"] is None and result["fundamentals"].get("price") is not None:
+        result["current_price"] = result["fundamentals"]["price"]
+
+    yoy = await get_yoy_change(ticker)
+    result["yoy_change_pct"] = yoy
+
+    return result
+

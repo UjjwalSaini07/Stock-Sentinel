@@ -17,6 +17,14 @@ async def get_stock(ticker: str):
         raise HTTPException(status_code=404, detail=f"Stock '{ticker}' not found. Make sure the scraper has fetched it.")
     return stock
 
+@router.get("/{ticker}/analysis")
+async def get_analysis(ticker: str):
+    from app.services.analysis_service import get_stock_analysis
+    analysis = await get_stock_analysis(ticker.upper())
+    if "error" in analysis:
+        raise HTTPException(status_code=400, detail=analysis["error"])
+    return analysis
+
 @router.get("/{ticker}/history")
 async def get_stock_history(ticker: str):
     import httpx
