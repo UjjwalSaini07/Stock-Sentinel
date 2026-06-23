@@ -1847,7 +1847,7 @@ export default function QuantLabPage() {
                       else if (hasTrend) category = 'Trend Rider'
 
                       return (
-                        <div key={strat.id} className="card bg-[#050507] border border-white/5 hover:border-brand-500/30 p-5 flex flex-col justify-between space-y-4 group transition-all duration-300 relative overflow-hidden">
+                        <div key={strat.id} className="card bg-[#050507] border border-white/5 hover:border-brand-500/30 p-5 flex flex-col justify-between space-y-4 group transition-all duration-300 relative hover:z-20">
                           
                           {/* Card Header & Badges */}
                           <div className="space-y-2">
