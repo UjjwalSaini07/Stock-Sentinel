@@ -281,3 +281,53 @@ All endpoints except `/auth/register` and `/auth/login` require an `Authorizatio
     "timestamp": "2026-06-17T15:53:50Z"
   }
   ```
+
+
+## 6. Market Intelligence Endpoints
+
+All endpoints require JWT Bearer authentication headers.
+
+### Get Global Markets Overview
+* **URL:** `/intel/markets`
+* **Method:** `GET`
+* **Success Response (200 OK):** Returns grouped list of indices, commodities, forex, and cryptocurrency assets (including ticker, name, price, change, change_pct, and sparkline arrays).
+
+### Get Sector Rotation Momentum
+* **URL:** `/intel/sectors`
+* **Method:** `GET`
+* **Success Response (200 OK):** Returns benchmark 1-month change, sector relative strength matrices, and quadrant mappings (Leading, Improving, Lagging, Weakening).
+
+### Get Economic Calendar
+* **URL:** `/intel/calendar/economic`
+* **Method:** `GET`
+* **Success Response (200 OK):** Returns upcoming economic events (inflation rate decisions, GDP growth estimates, non-farm payroll releases).
+
+### Get Corporate actions Calendar
+* **URL:** `/intel/calendar/corporate`
+* **Method:** `GET`
+* **Success Response (200 OK):** Returns corporate earnings dates, stock splits, dividends, and corporate actions filtered for the user's watchlist tickers.
+
+### Get Insider Trading Records
+* **URL:** `/intel/insiders`
+* **Method:** `GET`
+* **Success Response (200 OK):** Returns insider buying/selling transactions for user's watchlist tickers.
+
+### Get AI News Intelligence
+* **URL:** `/intel/news`
+* **Method:** `GET`
+* **Success Response (200 OK):** Returns Llama-3 parsed news event clusters, sentiment tags (Bullish/Bearish/Neutral), and estimated market impact scores.
+
+### Get Daily Briefing Feed
+* **URL:** `/intel/briefing`
+* **Method:** `GET`
+* **Success Response (200 OK):** Returns high-level terminal market briefing context.
+
+### Get Treasury Yield Curve Rates
+* **URL:** `/intel/yields`
+* **Method:** `GET`
+* **Success Response (200 OK):** Returns sovereign bond yield curve data (1-month, 3-month, 1-year, 5-year, 10-year yields).
+
+### Get Block Deals Ledger
+* **URL:** `/intel/blockdeals`
+* **Method:** `GET`
+* **Success Response (200 OK):** Returns bulk block deals executed on exchanges for user's watchlist.
