@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { 
   Send, CheckCircle2, ExternalLink, Copy, ChevronDown, 
-  Eye, EyeOff, Server, MessageSquare, RefreshCw, Trash2 
+  Eye, EyeOff, Server, MessageSquare, RefreshCw, Trash2, AlertTriangle 
 } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import { userApi } from '@/lib/api'
@@ -17,6 +17,7 @@ export default function TelegramLinkCard() {
   const [isConnecting, setIsConnecting] = useState(false)
   const [connectStep, setConnectStep] = useState(0)
   const [testSending, setTestSending] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
 
   // Load existing credentials if linked
   useEffect(() => {
@@ -78,13 +79,12 @@ export default function TelegramLinkCard() {
   }
 
   async function handleDisconnect() {
-    if (!confirm('Are you sure you want to disconnect your Telegram bot? Alert feeds will stop.')) return
-    
     try {
       await userApi.linkTelegram('', '')
       await refreshUser()
       setBotToken('')
       setChatId('')
+      setShowConfirm(false)
       toast.success('Telegram bot disconnected')
     } catch {
       toast.error('Failed to disconnect bot')
@@ -106,6 +106,45 @@ export default function TelegramLinkCard() {
 
   // Render Connected State
   if (user?.telegram_linked) {
+    if (showConfirm) {
+      return (
+        <div className="card relative overflow-hidden border-red-500/20 bg-red-950/10 p-6 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.3)] animate-fade-in">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full bg-red-500/5 blur-[80px] pointer-events-none" />
+          
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 shrink-0 shadow-lg shadow-red-500/5 animate-pulse">
+                <AlertTriangle size={24} />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-red-300 font-sans">Disconnect Telegram Bot?</h3>
+                <p className="text-gray-400 text-xs mt-1">
+                  Once disconnected, you will stop receiving real-time stock alerts and summaries.
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowConfirm(false)}
+                className="px-4 py-2.5 bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 rounded-xl text-white text-xs font-semibold transition-all duration-150 active:scale-95"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDisconnect}
+                className="px-4 py-2.5 bg-red-600 hover:bg-red-700 border border-red-500/30 rounded-xl text-white text-xs font-bold transition-all duration-150 active:scale-95 shadow-lg shadow-red-500/10"
+              >
+                Yes, Disconnect
+              </button>
+            </div>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div className="card relative overflow-hidden border-emerald-500/20 bg-emerald-950/10 p-6 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.3)] animate-fade-in">
         {/* Background glow */}
@@ -153,7 +192,8 @@ export default function TelegramLinkCard() {
             </button>
             
             <button
-              onClick={handleDisconnect}
+              type="button"
+              onClick={() => setShowConfirm(true)}
               className="p-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 text-red-400 rounded-xl transition-all duration-150 active:scale-95"
               title="Disconnect Telegram Bot"
             >

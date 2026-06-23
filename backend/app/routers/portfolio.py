@@ -107,9 +107,14 @@ async def test_telegram_connection(user=Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="Telegram bot credentials are not configured")
         
     message = (
-        "🎯 *StockSentinel Alert Connection Verified*\n\n"
-        "Your custom bot is now successfully connected to your StockSentinel account! "
-        "You will receive live stock alerts, target levels, and portfolio summaries directly here."
+        "🎯 *StockSentinel | Connection Verified*\n\n"
+        "Your private notification console is now successfully bridged to your StockSentinel account.\n\n"
+        "📈 *Security Protocol:* Active\n"
+        "📊 *Telemetry Status:* Live\n"
+        "⚡ *Transmission Latency:* <50ms\n\n"
+        "You will receive real-time threshold breaches, volume breakouts, and portfolio diagnostics here.\n\n"
+        "\n"
+        "👤 *System Architect:* Ujjwal Saini\n"
     )
     
     import httpx
