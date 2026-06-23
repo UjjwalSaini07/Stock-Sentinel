@@ -11,6 +11,7 @@ const NAV = [
   { href: '/watchlist', label: 'Watchlist', icon: Eye, desc: 'Track stocks' },
   { href: '/alerts', label: 'Alerts', icon: Bell, desc: 'Price notifications' },
   { href: '/copilot', label: 'AI Copilot', icon: Bot, desc: 'AI assistant' },
+  { href: '/quant', label: 'Quant Lab', icon: TrendingUp, desc: 'Quantitative research' },
   { href: '/architecture', label: 'System Architecture', icon: Cpu, desc: 'Platform blueprint' },
 ]
 
