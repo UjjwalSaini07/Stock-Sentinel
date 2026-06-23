@@ -7,6 +7,7 @@
 
 StockSentinel is a production-grade personal wealth-tracking intelligence agent. Built on top of an automated fundamental data scraper, it integrates real-time equity analysis powered by **Groq AI (Llama 3.3)**, calculates **live portfolio Value-at-Risk (VaR 95%)**, conducts **technical RSI-14 / SMA-50 screeners**, and triggers **rebalancing recommendations** through a rules-based investment decision matrix.
 
+<img width="1536" height="1024" alt="dda2f4e6-0a64-49a7-a455-46c3e249c093" src="https://github.com/user-attachments/assets/86eb1591-c9e9-4fc5-b2af-a0d226d598e1" />
 
 ## 1. System Architecture
 
