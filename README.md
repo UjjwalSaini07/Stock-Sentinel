@@ -9,6 +9,7 @@ StockSentinel is a production-grade personal wealth-tracking intelligence agent.
 
 All pricing outputs default to **Indian Rupees (₹)**. For global assets, the USD or native local currency price is displayed alongside as a reference.
 
+<img width="1536" height="1024" alt="dda2f4e6-0a64-49a7-a455-46c3e249c093" src="https://github.com/user-attachments/assets/86eb1591-c9e9-4fc5-b2af-a0d226d598e1" />
 
 ## 1. System Architecture
 
