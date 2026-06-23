@@ -71,7 +71,7 @@ export default function NotFound() {
   }
 
   return (
-    <div className="h-screen max-h-screen bg-black text-white relative flex flex-col justify-between overflow-hidden selection:bg-brand/35 selection:text-white font-sans antialiased">
+    <div className="min-h-screen h-auto lg:h-screen lg:max-h-screen bg-black text-white relative flex flex-col justify-between overflow-y-auto lg:overflow-hidden selection:bg-brand/35 selection:text-white font-sans antialiased">
       {/* Glow Backdrops */}
       <div className="absolute inset-0 pointer-events-none z-0">
         <div className="absolute top-[-10%] left-[10%] w-[300px] h-[300px] rounded-full bg-brand-500/10 blur-[120px] opacity-60" />
@@ -95,9 +95,9 @@ export default function NotFound() {
       </header>
 
       {/* Main Container - Strict layout fitting viewport */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 flex flex-col lg:flex-row items-stretch justify-between gap-6 z-10 overflow-hidden py-4">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-6 flex flex-col lg:flex-row items-stretch justify-between gap-6 z-10 overflow-visible lg:overflow-hidden py-4">
         {/* Left Column: Ticker Crash & Terminal */}
-        <div className="w-full lg:w-[48%] flex flex-col justify-between gap-4 h-full">
+        <div className="w-full lg:w-[48%] flex flex-col justify-between gap-4 h-auto lg:h-full">
           {/* Headline & Description */}
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
@@ -198,7 +198,7 @@ export default function NotFound() {
         </div>
 
         {/* Right Column: Platform Architecture & Author Details (Hacker / Quant terminal design) */}
-        <div className="w-full lg:w-[48%] flex flex-col justify-between gap-4 h-full">
+        <div className="w-full lg:w-[48%] flex flex-col justify-between gap-4 h-auto lg:h-full">
           {/* Card 1: Platform Architecture Grid */}
           <div className="card border border-brand-500/20 bg-black/60 p-4.5 rounded-xl flex flex-col gap-3 shadow-lg flex-1">
             <div className="flex items-center gap-2 border-b border-white/5 pb-2 shrink-0">
