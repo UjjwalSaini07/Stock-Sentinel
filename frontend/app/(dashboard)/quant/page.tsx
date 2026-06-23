@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import { 
   TrendingUp, Play, Plus, Trash2, Save, Layers, Workflow, 
-  Database, Zap, BarChart3, ChevronRight, CheckCircle, Info, AlertTriangle, BookOpen, Search
+  Database, Zap, BarChart3, ChevronRight, CheckCircle, Info, AlertTriangle, BookOpen, Search, ThumbsUp
 } from 'lucide-react'
 import { 
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, 
@@ -268,10 +268,7 @@ export default function QuantLabPage() {
   const [optRange, setOptRange] = useState<string>('1y')
   const [optResult, setOptResult] = useState<any | null>(null)
 
-  // ── Tab 3: Rebalance States ──────────────────────────────
-  const [holdings, setHoldings] = useState<any[]>([])
-  const [rebalanceTargets, setRebalanceTargets] = useState<Record<string, number>>({})
-  const [rebalanceResult, setRebalanceResult] = useState<any | null>(null)
+
 
   // ── Tab 4: Correlation States ────────────────────────────
   const [corrTickers, setCorrTickers] = useState<string[]>([])
@@ -296,6 +293,58 @@ export default function QuantLabPage() {
 
   // ── Tab 7: Marketplace States ────────────────────────────
   const [marketplace, setMarketplace] = useState<any[]>([])
+  const [marketSearch, setMarketSearch] = useState<string>('')
+  const [marketFilter, setMarketFilter] = useState<string>('all')
+  const [marketSort, setMarketSort] = useState<string>('popular')
+  const [quickTestTicker, setQuickTestTicker] = useState<Record<string, string>>({})
+  const [quickTestResults, setQuickTestResults] = useState<Record<string, any>>({})
+  const [quickTesting, setQuickTesting] = useState<Record<string, boolean>>({})
+
+  // Dynamic Market Regime States
+  const [marketRegime, setMarketRegime] = useState<string>('')
+  const [regimeSentiment, setRegimeSentiment] = useState<string>('')
+  const [regimeLoading, setRegimeLoading] = useState<boolean>(false)
+  const [marketHeadlines, setMarketHeadlines] = useState<string[]>([])
+  const [regimeRecommendation, setRegimeRecommendation] = useState<string>('')
+  const [regimeAnalysis, setRegimeAnalysis] = useState<string>('')
+  const [primarySymbol, setPrimarySymbol] = useState<string>('')
+
+  async function handleUpvote(id: string) {
+    try {
+      await quantApi.upvote(id)
+      setMarketplace(prev => prev.map(item => item.id === id ? { ...item, upvotes: (item.upvotes || 0) + 1 } : item))
+      toast.success('Strategy upvoted!')
+    } catch {
+      toast.error('Failed to upvote strategy')
+    }
+  }
+
+  async function runQuickBacktest(stratId: string, indicatorsConfig: any[], logicGate: string, overrideTicker?: string) {
+    const ticker = (overrideTicker || quickTestTicker[stratId] || '').trim().toUpperCase()
+    if (!ticker) {
+      toast.error('Please enter a ticker symbol')
+      return
+    }
+    if (overrideTicker) {
+      setQuickTestTicker(prev => ({ ...prev, [stratId]: overrideTicker }))
+    }
+    setQuickTesting(prev => ({ ...prev, [stratId]: true }))
+    try {
+      const { data } = await quantApi.backtest({
+        ticker,
+        indicators: indicatorsConfig,
+        logic: logicGate,
+        initial_capital: 100000,
+        range: '1y'
+      })
+      setQuickTestResults(prev => ({ ...prev, [stratId]: data }))
+      toast.success(`Quick test complete for ${ticker}`)
+    } catch (e: any) {
+      toast.error(e.response?.data?.detail || 'Quick backtest failed')
+    } finally {
+      setQuickTesting(prev => ({ ...prev, [stratId]: false }))
+    }
+  }
 
   // ── Initial Data Loading ─────────────────────────────────
   async function loadWatchlist() {
@@ -326,24 +375,7 @@ export default function QuantLabPage() {
     } catch {}
   }
 
-  async function loadPortfolio() {
-    try {
-      const { data } = await userApi.getMe()
-      if (data && data.portfolio && data.portfolio.length > 0) {
-        const imported = data.portfolio.map((p: any) => ({
-          ticker: p.ticker,
-          quantity: p.quantity,
-          current_price: p.current_price || p.buy_price
-        }))
-        setHoldings(imported)
-        
-        const evenWeight = 100 / imported.length
-        const targets: Record<string, number> = {}
-        imported.forEach((p: any) => { targets[p.ticker] = Math.round(evenWeight) })
-        setRebalanceTargets(targets)
-      }
-    } catch {}
-  }
+
 
   async function fetchMarketplace() {
     try {
@@ -354,10 +386,29 @@ export default function QuantLabPage() {
     }
   }
 
+  async function fetchMarketplaceRegime() {
+    setRegimeLoading(true)
+    try {
+      const { data } = await quantApi.getMarketplaceRegime()
+      setMarketRegime(data.regime)
+      setRegimeSentiment(data.sentiment)
+      setMarketHeadlines(data.headlines || [])
+      setRegimeRecommendation(data.recommendation)
+      setRegimeAnalysis(data.analysis)
+      setPrimarySymbol(data.primary_symbol)
+    } catch {
+      setMarketRegime('Stable Regime')
+      setRegimeSentiment('Neutral')
+      setRegimeRecommendation('Strategy defaults are active.')
+    } finally {
+      setRegimeLoading(false)
+    }
+  }
+
   useEffect(() => {
     loadWatchlist()
-    loadPortfolio()
     fetchMarketplace()
+    fetchMarketplaceRegime()
   }, [])
 
   // ── Backtester Handlers ──────────────────────────────────
@@ -486,68 +537,7 @@ export default function QuantLabPage() {
     }
   }
 
-  const applyWeightsToRebalancer = (weights: Record<string, number>) => {
-    const newHoldings = Object.keys(weights).map(ticker => {
-      const existing = holdings.find(h => h.ticker.toUpperCase() === ticker.toUpperCase())
-      return {
-        ticker,
-        quantity: existing ? existing.quantity : 10,
-        current_price: existing ? existing.current_price : 100
-      }
-    })
-    setHoldings(newHoldings)
-    setRebalanceTargets(weights)
-    setActiveTab('rebalance')
-    toast.success('Target weights transferred to Rebalancer')
-  }
 
-  // ── Rebalancer Handlers ──────────────────────────────────
-  const updateHoldingRow = (idx: number, field: string, val: any) => {
-    setHoldings(prev => prev.map((h, i) => i === idx ? { ...h, [field]: val } : h))
-  }
-
-  const addHoldingRow = () => {
-    setHoldings(prev => [...prev, { ticker: '', quantity: 10, current_price: 100 }])
-  }
-
-  const removeHoldingRow = (idx: number) => {
-    setHoldings(prev => prev.filter((_, i) => i !== idx))
-  }
-
-  const runRebalancer = async () => {
-    setLoading(true)
-    try {
-      const { data } = await quantApi.rebalance({
-        holdings,
-        target_weights: rebalanceTargets
-      })
-      setRebalanceResult(data)
-      toast.success('Rebalancing suggestions generated')
-    } catch (e: any) {
-      toast.error(e.response?.data?.detail || 'Rebalancing failed')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const importHoldingsIntoRebalancer = () => {
-    if (user?.portfolio && user.portfolio.length > 0) {
-      const imported = user.portfolio.map(p => ({
-        ticker: p.ticker,
-        quantity: p.quantity,
-        current_price: p.current_price || p.buy_price
-      }))
-      setHoldings(imported)
-      
-      const evenWeight = 100 / imported.length
-      const targets: Record<string, number> = {}
-      imported.forEach(p => { targets[p.ticker] = Math.round(evenWeight) })
-      setRebalanceTargets(targets)
-      toast.success('Holdings imported')
-    } else {
-      toast.error('No portfolio holdings found')
-    }
-  }
 
   // ── Correlation Handlers ─────────────────────────────────
   const runCorrelation = async () => {
@@ -698,7 +688,6 @@ export default function QuantLabPage() {
         {[
           { id: 'backtest', label: 'Strategy Backtester', icon: Play },
           { id: 'optimize', label: 'Portfolio Optimizer', icon: Workflow },
-          { id: 'rebalance', label: 'Smart Rebalancer', icon: Layers },
           { id: 'correlation', label: 'Correlation Heatmap', icon: Database },
           { id: 'factors', label: 'Factor Scanner', icon: Zap },
           { id: 'montecarlo', label: 'Monte Carlo Forecast', icon: BarChart3 },
@@ -802,12 +791,12 @@ export default function QuantLabPage() {
                         <select 
                           value={btRange} 
                           onChange={e => setBtRange(e.target.value)}
-                          className="w-full bg-black/40 border border-white/5 rounded-lg p-2 font-mono text-white outline-none focus:border-brand-500 cursor-pointer"
+                          className="w-full bg-[#121214] border border-white/5 rounded-lg p-2 font-mono text-white outline-none focus:border-brand-500 cursor-pointer"
                         >
-                          <option value="3mo">3 Months</option>
-                          <option value="6mo">6 Months</option>
-                          <option value="1y">1 Year</option>
-                          <option value="2y">2 Years</option>
+                          <option value="3mo" className="bg-[#121214] text-white">3 Months</option>
+                          <option value="6mo" className="bg-[#121214] text-white">6 Months</option>
+                          <option value="1y" className="bg-[#121214] text-white">1 Year</option>
+                          <option value="2y" className="bg-[#121214] text-white">2 Years</option>
                         </select>
                       </div>
                     </div>
@@ -817,10 +806,10 @@ export default function QuantLabPage() {
                       <select 
                         value={btLogic} 
                         onChange={e => setBtLogic(e.target.value)}
-                        className="w-full bg-black/40 border border-white/5 rounded-lg p-2 font-mono text-white outline-none focus:border-brand-500 cursor-pointer"
+                        className="w-full bg-[#121214] border border-white/5 rounded-lg p-2 font-mono text-white outline-none focus:border-brand-500 cursor-pointer"
                       >
-                        <option value="AND">All Conditions must match (AND)</option>
-                        <option value="OR">Any Condition matches (OR)</option>
+                        <option value="AND" className="bg-[#121214] text-white">All Conditions must match (AND)</option>
+                        <option value="OR" className="bg-[#121214] text-white">Any Condition matches (OR)</option>
                       </select>
                     </div>
 
@@ -843,13 +832,13 @@ export default function QuantLabPage() {
                               <select 
                                 value={ind.type} 
                                 onChange={e => updateIndicatorRow(idx, 'type', e.target.value)}
-                                className="bg-white/5 border border-white/5 rounded p-1 text-[10px] outline-none"
+                                className="bg-[#121214] border border-white/10 text-white rounded p-1 text-[10px] outline-none cursor-pointer"
                               >
-                                <option value="RSI">RSI</option>
-                                <option value="SMA">SMA</option>
-                                <option value="EMA">EMA</option>
-                                <option value="MACD">MACD</option>
-                                <option value="BB">Bollinger Bands</option>
+                                <option value="RSI" className="bg-[#121214] text-white">RSI</option>
+                                <option value="SMA" className="bg-[#121214] text-white">SMA</option>
+                                <option value="EMA" className="bg-[#121214] text-white">EMA</option>
+                                <option value="MACD" className="bg-[#121214] text-white">MACD</option>
+                                <option value="BB" className="bg-[#121214] text-white">Bollinger Bands</option>
                               </select>
                               <input 
                                 type="number" 
@@ -863,12 +852,12 @@ export default function QuantLabPage() {
                               <select 
                                 value={ind.condition} 
                                 onChange={e => updateIndicatorRow(idx, 'condition', e.target.value)}
-                                className="bg-white/5 border border-white/5 rounded p-1 text-[10px] outline-none"
+                                className="bg-[#121214] border border-white/10 text-white rounded p-1 text-[10px] outline-none cursor-pointer"
                               >
-                                <option value="below">Less Than (&lt;)</option>
-                                <option value="above">Greater Than (&gt;)</option>
-                                <option value="cross_above">Crosses Above</option>
-                                <option value="cross_below">Crosses Below</option>
+                                <option value="below" className="bg-[#121214] text-white">Less Than (&lt;)</option>
+                                <option value="above" className="bg-[#121214] text-white">Greater Than (&gt;)</option>
+                                <option value="cross_above" className="bg-[#121214] text-white">Crosses Above</option>
+                                <option value="cross_below" className="bg-[#121214] text-white">Crosses Below</option>
                               </select>
                               {ind.type === 'RSI' && (
                                 <input 
@@ -957,7 +946,7 @@ export default function QuantLabPage() {
                             <CartesianGrid strokeDasharray="3 3" stroke="#121214" vertical={false} />
                             <XAxis dataKey="date" stroke="#4b5563" fontSize={10} tickLine={false} />
                             <YAxis stroke="#4b5563" fontSize={10} tickLine={false} domain={['auto', 'auto']} />
-                            <Tooltip contentStyle={{ backgroundColor: '#050507', borderColor: '#121214', borderRadius: '8px' }} labelStyle={{ color: '#9ca3af' }} />
+                            <Tooltip contentStyle={{ backgroundColor: '#050507', borderColor: '#121214', borderRadius: '8px' }} itemStyle={{ color: '#ffffff' }} labelStyle={{ color: '#9ca3af' }} />
                             <Area type="monotone" dataKey="equity" stroke="#26a366" strokeWidth={2} fillOpacity={1} fill="url(#eqGlow)" />
                           </AreaChart>
                         </ResponsiveContainer>
@@ -979,7 +968,7 @@ export default function QuantLabPage() {
                             <CartesianGrid strokeDasharray="3 3" stroke="#121214" vertical={false} />
                             <XAxis dataKey="date" stroke="#4b5563" fontSize={8} tickLine={false} />
                             <YAxis stroke="#4b5563" fontSize={10} tickLine={false} domain={[0, 'auto']} reversed />
-                            <Tooltip contentStyle={{ backgroundColor: '#050507', borderColor: '#121214', borderRadius: '8px' }} />
+                            <Tooltip contentStyle={{ backgroundColor: '#050507', borderColor: '#121214', borderRadius: '8px' }} itemStyle={{ color: '#ffffff' }} labelStyle={{ color: '#9ca3af' }} />
                             <Area type="monotone" dataKey="drawdown" stroke="#ef4444" strokeWidth={1.5} fillOpacity={1} fill="url(#ddGlow)" />
                           </AreaChart>
                         </ResponsiveContainer>
@@ -1131,11 +1120,11 @@ export default function QuantLabPage() {
                     <select 
                       value={optRange} 
                       onChange={e => setOptRange(e.target.value)}
-                      className="w-full bg-black/40 border border-white/5 rounded-lg p-2 font-mono text-white outline-none focus:border-brand-500 cursor-pointer"
+                      className="w-full bg-[#121214] border border-white/5 rounded-lg p-2 font-mono text-white outline-none focus:border-brand-500 cursor-pointer"
                     >
-                      <option value="6mo">6 Months</option>
-                      <option value="1y">1 Year</option>
-                      <option value="2y">2 Years</option>
+                      <option value="6mo" className="bg-[#121214] text-white">6 Months</option>
+                      <option value="1y" className="bg-[#121214] text-white">1 Year</option>
+                      <option value="2y" className="bg-[#121214] text-white">2 Years</option>
                     </select>
                   </div>
 
@@ -1189,13 +1178,6 @@ export default function QuantLabPage() {
                             </div>
                           ))}
                         </div>
-
-                        <button 
-                          onClick={() => applyWeightsToRebalancer(optResult.max_sharpe_portfolio.weights)}
-                          className="w-full p-2 bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/30 text-brand-300 rounded-xl text-xs font-bold transition-all mt-4"
-                        >
-                          Load into Rebalancer
-                        </button>
                       </div>
 
                       {/* Min Volatility */}
@@ -1226,13 +1208,6 @@ export default function QuantLabPage() {
                             </div>
                           ))}
                         </div>
-
-                        <button 
-                          onClick={() => applyWeightsToRebalancer(optResult.min_vol_portfolio.weights)}
-                          className="w-full p-2 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 rounded-xl text-xs font-bold transition-all mt-4"
-                        >
-                          Load into Rebalancer
-                        </button>
                       </div>
 
                     </div>
@@ -1246,7 +1221,7 @@ export default function QuantLabPage() {
                             <CartesianGrid stroke="#121214" strokeDasharray="3 3" />
                             <XAxis type="number" dataKey="volatility" name="Volatility" unit="%" stroke="#4b5563" fontSize={10} />
                             <YAxis type="number" dataKey="return" name="Return" unit="%" stroke="#4b5563" fontSize={10} />
-                            <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: '#050507', borderColor: '#121214', borderRadius: '8px' }} />
+                            <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: '#050507', borderColor: '#121214', borderRadius: '8px' }} itemStyle={{ color: '#ffffff' }} labelStyle={{ color: '#9ca3af' }} />
                             <Scatter name="Portfolios" data={optResult.efficient_frontier} fill="#374151" line={false} />
                             <Scatter 
                               name="Max Sharpe" 
@@ -1272,179 +1247,7 @@ export default function QuantLabPage() {
             </div>
           )}
 
-          {/* ── TAB 3: SMART REBALANCER ─────────────────────────── */}
-          {activeTab === 'rebalance' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* Configuration holdings */}
-              <div className="lg:col-span-6 card bg-white/[0.01] border-white/5 p-5 space-y-4">
-                <div className="border-b border-white/5 pb-2.5 flex items-center justify-between">
-                  <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
-                    Current Position Settings
-                    <InfoTooltip content="Calculate portfolio rebalancing adjustments. Input your current holdings and target weights (e.g. from the Max Sharpe optimizer) to compute target values, current deviations, and exact buy/sell trade instructions." />
-                  </h3>
-                  <button 
-                    onClick={importHoldingsIntoRebalancer}
-                    className="text-[10px] text-brand-400 font-bold hover:underline"
-                  >
-                    Import holdings
-                  </button>
-                </div>
 
-                <div className="space-y-4 text-xs">
-                  <div className="space-y-2">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="border-b border-white/5 text-gray-500 font-mono">
-                          <th className="pb-2">Ticker</th>
-                          <th className="pb-2">Qty</th>
-                          <th className="pb-2">Price (Rs.)</th>
-                          <th className="pb-2">Target Weight %</th>
-                          <th className="pb-2"></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {holdings.map((h, i) => (
-                          <tr key={i} className="border-b border-white/[0.01]">
-                            <td className="py-1.5 pr-2">
-                              <input 
-                                type="text" 
-                                value={h.ticker} 
-                                onChange={e => updateHoldingRow(i, 'ticker', e.target.value.toUpperCase())}
-                                className="w-16 bg-white/5 border border-white/5 rounded p-1 font-mono text-center outline-none"
-                              />
-                            </td>
-                            <td className="py-1.5 pr-2">
-                              <input 
-                                type="number" 
-                                value={h.quantity} 
-                                onChange={e => updateHoldingRow(i, 'quantity', Number(e.target.value))}
-                                className="w-16 bg-white/5 border border-white/5 rounded p-1 font-mono text-center outline-none"
-                              />
-                            </td>
-                            <td className="py-1.5 pr-2">
-                              <input 
-                                type="number" 
-                                value={h.current_price} 
-                                onChange={e => updateHoldingRow(i, 'current_price', Number(e.target.value))}
-                                className="w-20 bg-white/5 border border-white/5 rounded p-1 font-mono text-center outline-none"
-                              />
-                            </td>
-                            <td className="py-1.5 pr-2">
-                              <input 
-                                type="number" 
-                                value={rebalanceTargets[h.ticker] || 0} 
-                                onChange={e => setRebalanceTargets(prev => ({ ...prev, [h.ticker]: Number(e.target.value) }))}
-                                className="w-16 bg-white/5 border border-white/5 rounded p-1 font-mono text-center outline-none text-brand-300 font-bold"
-                              />
-                            </td>
-                            <td className="py-1.5 text-right">
-                              <button onClick={() => removeHoldingRow(i)} className="text-gray-600 hover:text-red-400">
-                                <Trash2 size={12} />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={addHoldingRow}
-                      className="flex-1 p-2 border border-dashed border-white/10 hover:border-brand-500/30 text-gray-500 hover:text-brand-300 rounded-xl text-center font-bold font-mono transition-all"
-                    >
-                      + Add Asset Row
-                    </button>
-                    <button 
-                      onClick={runRebalancer}
-                      className="flex-1 p-2 bg-brand-500 hover:bg-brand-600 border border-brand-500/20 text-white rounded-xl text-center font-bold transition-all"
-                    >
-                      Calculate Rebalance
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Outputs recommendations */}
-              <div className="lg:col-span-6 space-y-6">
-                {!rebalanceResult ? (
-                  <div className="card bg-white/[0.01] border-white/5 p-12 text-center space-y-3">
-                    <Layers className="mx-auto text-gray-500" size={24} />
-                    <h3 className="text-sm font-bold text-white font-mono">No Recommendations Generated</h3>
-                    <p className="text-xs text-gray-500 max-w-sm mx-auto">Set up your current stock positions, specify target weight distribution, and click rebalance.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {/* Orders summary */}
-                    <div className="card bg-brand-500/[0.02] border-brand-500/20 p-5 space-y-4">
-                      <div className="border-b border-brand-500/10 pb-2">
-                        <h4 className="text-xs font-bold text-brand-300 uppercase tracking-wider flex items-center gap-2">
-                          <CheckCircle size={14} className="text-brand-400" /> Suggested Rebalancing Trade Orders
-                        </h4>
-                      </div>
-                      <div className="text-[10px] text-gray-500 font-mono">
-                        Total Portfolio Value: <strong>Rs. {rebalanceResult.total_value.toLocaleString()}</strong>
-                      </div>
-
-                      <div className="space-y-2">
-                        {rebalanceResult.orders.length === 0 ? (
-                          <div className="p-4 bg-white/[0.01] border border-white/5 rounded-xl text-xs text-center text-gray-400">
-                            Holdings match target weights! No trades required.
-                          </div>
-                        ) : (
-                          rebalanceResult.orders.map((o: any, i: number) => (
-                            <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-black border border-white/5 text-xs">
-                              <span className={`font-bold px-2 py-0.5 rounded text-[10px] ${o.action === 'BUY' ? 'bg-brand-500/10 text-brand-400' : 'bg-red-500/10 text-red-400'}`}>
-                                {o.action}
-                              </span>
-                              <div className="flex-1">
-                                <div className="font-bold text-[11px]">{o.ticker}</div>
-                                <div className="text-[9px] text-gray-500 font-mono">Price: Rs. {o.current_price}</div>
-                              </div>
-                              <div className="text-right">
-                                <div className="font-bold font-mono">Qty: {o.quantity}</div>
-                                <div className="text-[9px] text-gray-500 font-mono">Val: Rs. {o.value.toLocaleString()}</div>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Allocation spread table */}
-                    <div className="card bg-white/[0.01] border-white/5 p-5 space-y-4">
-                      <h4 className="text-xs font-bold text-white uppercase tracking-wider">Allocation Variance Analysis</h4>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left text-xs border-collapse font-mono">
-                          <thead>
-                            <tr className="border-b border-white/5 text-gray-500">
-                              <th className="pb-2">Asset</th>
-                              <th className="pb-2 text-right">Current Value</th>
-                              <th className="pb-2 text-right">Current %</th>
-                              <th className="pb-2 text-right">Target %</th>
-                              <th className="pb-2 text-right">Target Value</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {rebalanceResult.allocations.map((a: any, i: number) => (
-                              <tr key={i} className="border-b border-white/[0.02]">
-                                <td className="py-2 font-bold text-white">{a.ticker}</td>
-                                <td className="py-2 text-right">Rs. {a.current_value.toLocaleString()}</td>
-                                <td className="py-2 text-right">{a.current_pct}%</td>
-                                <td className="py-2 text-right text-brand-300 font-bold">{a.target_pct}%</td>
-                                <td className="py-2 text-right">Rs. {a.target_value.toLocaleString()}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* ── TAB 4: CORRELATION HEATMAP ──────────────────────── */}
           {activeTab === 'correlation' && (
@@ -1484,11 +1287,11 @@ export default function QuantLabPage() {
                     <select 
                       value={corrRange} 
                       onChange={e => setCorrRange(e.target.value)}
-                      className="w-full bg-black/40 border border-white/5 rounded-lg p-2 font-mono text-white outline-none focus:border-brand-500 cursor-pointer"
+                      className="w-full bg-[#121214] border border-white/5 rounded-lg p-2 font-mono text-white outline-none focus:border-brand-500 cursor-pointer"
                     >
-                      <option value="6mo">6 Months</option>
-                      <option value="1y">1 Year</option>
-                      <option value="2y">2 Years</option>
+                      <option value="6mo" className="bg-[#121214] text-white">6 Months</option>
+                      <option value="1y" className="bg-[#121214] text-white">1 Year</option>
+                      <option value="2y" className="bg-[#121214] text-white">2 Years</option>
                     </select>
                   </div>
 
@@ -1750,12 +1553,12 @@ export default function QuantLabPage() {
                         <select 
                           value={stressScenario} 
                           onChange={e => setStressScenario(e.target.value)}
-                          className="w-full bg-black/40 border border-white/5 rounded-lg p-2 font-mono text-white outline-none focus:border-brand-500"
+                          className="w-full bg-[#121214] border border-white/5 rounded-lg p-2 font-mono text-white outline-none focus:border-brand-500"
                         >
-                          <option value="lehman_2008">2008 Lehman Shock (-35% Return, 2.2x Vol)</option>
-                          <option value="covid_2020">2020 Covid Crash (-25% Return, 2.8x Vol)</option>
-                          <option value="rate_hike_2022">250bps Fed Rate Shock (-15% Return, 1.4x Vol)</option>
-                          <option value="stagflation">1970s Stagflation Shock (-12% Return, 1.6x Vol)</option>
+                          <option value="lehman_2008" className="bg-[#121214] text-white">2008 Lehman Shock (-35% Return, 2.2x Vol)</option>
+                          <option value="covid_2020" className="bg-[#121214] text-white">2020 Covid Crash (-25% Return, 2.8x Vol)</option>
+                          <option value="rate_hike_2022" className="bg-[#121214] text-white">250bps Fed Rate Shock (-15% Return, 1.4x Vol)</option>
+                          <option value="stagflation" className="bg-[#121214] text-white">1970s Stagflation Shock (-12% Return, 1.6x Vol)</option>
                         </select>
                       </div>
                       <button 
@@ -1817,7 +1620,7 @@ export default function QuantLabPage() {
                                 <CartesianGrid strokeDasharray="3 3" stroke="#121214" vertical={false} />
                                 <XAxis dataKey="day" stroke="#4b5563" fontSize={10} tickLine={false} />
                                 <YAxis stroke="#4b5563" fontSize={10} tickLine={false} domain={['auto', 'auto']} />
-                                <Tooltip contentStyle={{ backgroundColor: '#050507', borderColor: '#121214', borderRadius: '8px' }} />
+                                <Tooltip contentStyle={{ backgroundColor: '#050507', borderColor: '#121214', borderRadius: '8px' }} itemStyle={{ color: '#ffffff' }} labelStyle={{ color: '#9ca3af' }} />
                                 <Area type="monotone" dataKey="bull" stroke="none" fill="url(#mcGlow)" />
                                 <Area type="monotone" dataKey="bear" stroke="none" fill="none" />
                                 <Area type="monotone" dataKey="median" stroke="#8b5cf6" strokeWidth={2} dot={false} fill="none" />
@@ -1876,7 +1679,7 @@ export default function QuantLabPage() {
                                 <CartesianGrid strokeDasharray="3 3" stroke="#121214" vertical={false} />
                                 <XAxis dataKey="day" stroke="#4b5563" fontSize={10} tickLine={false} />
                                 <YAxis stroke="#4b5563" fontSize={10} tickLine={false} domain={['auto', 'auto']} />
-                                <Tooltip contentStyle={{ backgroundColor: '#050507', borderColor: '#121214', borderRadius: '8px' }} />
+                                <Tooltip contentStyle={{ backgroundColor: '#050507', borderColor: '#121214', borderRadius: '8px' }} itemStyle={{ color: '#ffffff' }} labelStyle={{ color: '#9ca3af' }} />
                                 <Area type="monotone" dataKey="bull" stroke="none" fill="url(#stressGlow)" />
                                 <Area type="monotone" dataKey="bear" stroke="none" fill="none" />
                                 <Area type="monotone" dataKey="normal" name="Normal (Median)" stroke="#8b5cf6" strokeWidth={2} dot={false} fill="none" />
@@ -1896,7 +1699,8 @@ export default function QuantLabPage() {
           {/* ── TAB 7: STRATEGY MARKETPLACE ─────────────────────── */}
           {activeTab === 'marketplace' && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between border-b border-surface-border/50 pb-2">
+              {/* Header & Filters row */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-surface-border/50 pb-4 gap-4">
                 <div>
                   <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
                     Saved Quantitative Strategies
@@ -1904,60 +1708,393 @@ export default function QuantLabPage() {
                   </h3>
                   <p className="text-xs text-gray-500 mt-0.5">Explore pre-saved quant trading formulas or run backtests on shared assets.</p>
                 </div>
+
+                {/* Filter & Search Bar */}
+                <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search strategy..."
+                      value={marketSearch}
+                      onChange={e => setMarketSearch(e.target.value)}
+                      className="bg-black/40 border border-white/5 rounded-lg pl-8 pr-2.5 py-1.5 w-44 text-[11px] outline-none focus:border-brand-500 text-white placeholder-gray-600"
+                    />
+                    <Search size={11} className="absolute left-2.5 top-2.5 text-gray-600" />
+                  </div>
+
+                  <select
+                    value={marketFilter}
+                    onChange={e => setMarketFilter(e.target.value)}
+                    className="bg-[#121214] border border-white/5 rounded-lg px-2.5 py-1.5 text-[11px] text-white outline-none cursor-pointer"
+                  >
+                    <option value="all" className="bg-[#121214] text-white">All Indicators</option>
+                    <option value="rsi" className="bg-[#121214] text-white">RSI Strategies</option>
+                    <option value="macd" className="bg-[#121214] text-white">MACD Strategies</option>
+                    <option value="ma" className="bg-[#121214] text-white">Moving Average (SMA/EMA)</option>
+                    <option value="bb" className="bg-[#121214] text-white">Bollinger Bands</option>
+                  </select>
+
+                  <select
+                    value={marketSort}
+                    onChange={e => setMarketSort(e.target.value)}
+                    className="bg-[#121214] border border-white/5 rounded-lg px-2.5 py-1.5 text-[11px] text-white outline-none cursor-pointer"
+                  >
+                    <option value="popular" className="bg-[#121214] text-white">Most Popular</option>
+                    <option value="newest" className="bg-[#121214] text-white">Newest First</option>
+                    <option value="alphabetical" className="bg-[#121214] text-white">Alphabetical</option>
+                  </select>
+                </div>
               </div>
 
-              {marketplace.length === 0 ? (
-                <div className="card bg-white/[0.01] border-white/5 p-12 text-center space-y-3">
-                  <BookOpen className="mx-auto text-gray-500" size={24} />
-                  <h3 className="text-sm font-bold text-white font-mono">Marketplace is Empty</h3>
-                  <p className="text-xs text-gray-500 max-w-sm mx-auto">Create and save strategy configurations in the Strategy Backtester tab to publish them here.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {marketplace.map((strat) => (
-                    <div key={strat.id} className="card bg-[#050507] border border-white/5 hover:border-brand-500/30 p-5 flex flex-col justify-between space-y-4 group transition-all duration-300">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <h4 className="text-sm font-bold text-white group-hover:text-brand-300 transition-colors">{strat.name}</h4>
-                          <span className="text-[9px] font-mono bg-white/5 px-2 py-0.5 rounded text-gray-400 font-bold uppercase">
-                            Gate: {strat.logic || 'AND'}
-                          </span>
+              {/* Regime Recommender Banner */}
+              {marketRegime && (
+                <div className="card bg-gradient-to-r from-brand-950/20 via-black/40 to-surface-card/30 border border-white/5 p-4 rounded-xl space-y-3 relative overflow-hidden animate-slide-up">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 relative z-10">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono font-bold text-gray-500 uppercase tracking-widest">
+                          Active Market Regime ({primarySymbol})
+                        </span>
+                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[9px] font-bold text-white font-mono">
+                          <span className={`h-1.5 w-1.5 rounded-full animate-pulse ${
+                            regimeSentiment === 'Positive' ? 'bg-brand-500 shadow-[0_0_8px_#10b981]' :
+                            regimeSentiment === 'Negative' ? 'bg-red-500 shadow-[0_0_8px_#ef4444]' :
+                            'bg-amber-500 shadow-[0_0_8px_#f59e0b]'
+                          }`} />
+                          {marketRegime.toUpperCase()}
                         </div>
-                        <p className="text-xs text-gray-400 leading-normal min-h-[40px]">
-                          {strat.description || 'No description provided.'}
-                        </p>
                       </div>
+                      <p className="text-xs text-white leading-relaxed font-semibold">
+                        {regimeRecommendation}
+                      </p>
+                      <p className="text-[10px] text-gray-400">
+                        {regimeAnalysis}
+                      </p>
+                    </div>
 
-                      <div className="divider" />
-
-                      <div className="space-y-3">
-                        <div className="flex flex-wrap gap-1">
-                          {strat.indicators.map((ind: any, i: number) => (
-                            <span 
-                              key={i}
-                              className="text-[9px] font-mono font-bold text-gray-400 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full"
-                            >
-                              {ind.type} (P: {ind.period})
-                            </span>
+                    {/* Scraped Headlines Context */}
+                    {marketHeadlines.length > 0 && (
+                      <div className="bg-black/40 border border-white/[0.04] p-3 rounded-lg max-w-sm w-full space-y-1.5">
+                        <span className="text-[8px] font-mono text-gray-500 uppercase tracking-wider font-bold">
+                          Scraped Headlines Context
+                        </span>
+                        <div className="space-y-1 text-[9px] font-mono text-gray-400">
+                          {marketHeadlines.slice(0, 2).map((h, idx) => (
+                            <div key={idx} className="line-clamp-1 border-l-2 border-brand-500/30 pl-1.5 py-0.2 hover:text-white transition-colors">
+                              {h}
+                            </div>
                           ))}
                         </div>
-
-                        <div className="flex items-center justify-between text-[10px] text-gray-500 font-mono">
-                          <span>By: <strong>{strat.creator_name}</strong></span>
-                          <span>{new Date(strat.created_at).toLocaleDateString()}</span>
-                        </div>
-
-                        <button 
-                          onClick={() => loadStrategyFromMarketplace(strat)}
-                          className="w-full flex items-center justify-center gap-1.5 p-2 rounded-xl bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/25 text-brand-300 font-bold text-xs transition-all duration-200"
-                        >
-                          Load into Strategy Builder <ChevronRight size={12} />
-                        </button>
                       </div>
-                    </div>
-                  ))}
+                    )}
+                  </div>
                 </div>
               )}
+
+              {(() => {
+                let list = [...marketplace]
+
+                if (marketSearch.trim()) {
+                  const q = marketSearch.toLowerCase()
+                  list = list.filter(item => 
+                    item.name.toLowerCase().includes(q) || 
+                    (item.description && item.description.toLowerCase().includes(q))
+                  )
+                }
+
+                if (marketFilter !== 'all') {
+                  list = list.filter(item => {
+                    const inds = item.indicators.map((ind: any) => ind.type.toUpperCase())
+                    if (marketFilter === 'rsi') return inds.includes('RSI')
+                    if (marketFilter === 'macd') return inds.includes('MACD')
+                    if (marketFilter === 'ma') return inds.includes('SMA') || inds.includes('EMA')
+                    if (marketFilter === 'bb') return inds.includes('BB')
+                    return true
+                  })
+                }
+
+                if (marketSort === 'popular') {
+                  list.sort((a, b) => (b.upvotes || 0) - (a.upvotes || 0))
+                } else if (marketSort === 'newest') {
+                  list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                } else if (marketSort === 'alphabetical') {
+                  list.sort((a, b) => a.name.localeCompare(b.name))
+                }
+
+                if (list.length === 0) {
+                  return (
+                    <div className="card bg-white/[0.01] border-white/5 p-12 text-center space-y-3">
+                      <BookOpen className="mx-auto text-gray-500" size={24} />
+                      <h3 className="text-sm font-bold text-white font-mono">No Matching Strategies</h3>
+                      <p className="text-xs text-gray-500 max-w-sm mx-auto">Try refining your search queries or category filters, or publish your strategy configs from the strategy tab.</p>
+                    </div>
+                  )
+                }
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {list.map((strat) => {
+                      const stratResults = quickTestResults[strat.id]
+                      const testing = quickTesting[strat.id]
+
+                      // Dynamically categorize the strategy
+                      const types = strat.indicators.map((ind: any) => ind.type.toUpperCase())
+                      const hasReversion = types.includes('RSI') || types.includes('BB')
+                      const hasTrend = types.includes('SMA') || types.includes('EMA') || types.includes('MACD')
+                      let category = 'Quant Custom'
+                      if (hasReversion && hasTrend) category = 'Multi-Factor'
+                      else if (hasReversion) category = 'Mean Reversion'
+                      else if (hasTrend) category = 'Trend Rider'
+
+                      return (
+                        <div key={strat.id} className="card bg-[#050507] border border-white/5 hover:border-brand-500/30 p-5 flex flex-col justify-between space-y-4 group transition-all duration-300 relative overflow-hidden">
+                          
+                          {/* Card Header & Badges */}
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[9px] font-mono font-bold bg-brand-500/10 text-brand-400 px-2 py-0.5 rounded-full border border-brand-500/20 uppercase tracking-wide">
+                                {category}
+                              </span>
+                              <span className="text-[8px] font-mono text-gray-500">
+                                {new Date(strat.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+
+                            <div className="space-y-1">
+                              <h4 className="text-sm font-bold text-white group-hover:text-brand-300 transition-colors font-mono tracking-tight flex items-center gap-1.5">
+                                <span>{strat.name}</span>
+                                <InfoTooltip content={strat.description || 'No description provided.'} />
+                              </h4>
+                              <p className="text-xs text-gray-400 leading-normal min-h-[38px] line-clamp-2">
+                                {strat.description || 'No description provided.'}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Rule Flowchart Visualization */}
+                          <div className="border-t border-white/[0.03] pt-3 space-y-2">
+                            <span className="text-[8px] text-gray-500 font-bold uppercase tracking-wider font-mono">
+                              Logic Workflow
+                            </span>
+                            
+                            <div className="flex items-stretch gap-2 min-h-[50px]">
+                              {/* Logic Gate Block */}
+                              <div className="flex flex-col items-center justify-center px-2 bg-[#09090b] border border-white/5 rounded-lg min-w-[50px] text-center relative select-none">
+                                <div className={`absolute inset-0 rounded-lg opacity-10 blur-[4px] ${strat.logic === 'OR' ? 'bg-cyan-500' : 'bg-amber-500'}`} />
+                                <span className={`text-[10px] font-bold font-mono tracking-wider ${strat.logic === 'OR' ? 'text-cyan-400' : 'text-amber-400'} z-10 uppercase`}>
+                                  {strat.logic || 'AND'}
+                                </span>
+                                <span className="text-[6px] text-gray-500 font-mono uppercase tracking-widest mt-0.5 z-10">Gate</span>
+                              </div>
+
+                              {/* Arrow Connector Line */}
+                              <div className="flex items-center text-gray-700 text-[10px] select-none font-mono">
+                                ➔
+                              </div>
+
+                              {/* Conditions List */}
+                              <div className="flex-1 flex flex-col justify-center gap-1">
+                                {strat.indicators.map((ind: any, i: number) => {
+                                  const isBuy = ind.condition === 'below' || ind.condition === 'cross_above'
+                                  return (
+                                    <div 
+                                      key={i} 
+                                      className={`flex items-center justify-between px-2 py-1 rounded-md border text-[9px] font-mono transition-all duration-200 ${
+                                        isBuy 
+                                          ? 'bg-brand-500/[0.02] border-brand-500/10 hover:border-brand-500/20 text-brand-300' 
+                                          : 'bg-red-500/[0.02] border-red-500/10 hover:border-red-500/20 text-red-300'
+                                      }`}
+                                    >
+                                      <span className="font-bold uppercase">
+                                        {ind.type}
+                                      </span>
+                                      
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-gray-500 text-[8px]">
+                                          {ind.condition.replace('_', ' ')}
+                                        </span>
+                                        {ind.value !== undefined && (
+                                          <span className="text-white font-bold px-1 rounded bg-white/5">
+                                            {ind.value}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Quick Backtest Panel */}
+                          <div className="p-3 bg-black/40 border border-white/5 rounded-xl space-y-2.5 text-[10px]">
+                            
+                            {/* Input Form & Buttons */}
+                            <div className="flex gap-1.5 items-center">
+                              <input
+                                type="text"
+                                placeholder="AAPL"
+                                value={quickTestTicker[strat.id] || ''}
+                                onChange={e => setQuickTestTicker(prev => ({ ...prev, [strat.id]: e.target.value.toUpperCase() }))}
+                                className="bg-[#121214] border border-white/5 rounded p-1 w-20 text-[10px] text-white font-mono outline-none uppercase"
+                              />
+                              <button
+                                onClick={() => runQuickBacktest(strat.id, strat.indicators, strat.logic || 'AND')}
+                                disabled={testing}
+                                className="flex-1 bg-brand-500/10 hover:bg-brand-500/20 text-brand-300 border border-brand-500/20 font-bold p-1 rounded font-mono disabled:opacity-50 text-[10px]"
+                              >
+                                {testing ? 'Testing...' : 'Quick Test'}
+                              </button>
+                            </div>
+
+                            {/* Watchlist Quick Add */}
+                            <div className="flex flex-wrap gap-1 items-center pt-1">
+                              <span className="text-[8px] text-gray-500 font-mono mr-1 uppercase">Quick Add:</span>
+                              {(watchlist && watchlist.length > 0 ? watchlist : ['AAPL', 'MSFT', 'SPY', 'QQQ']).map((symbol) => (
+                                <button
+                                  key={symbol}
+                                  onClick={() => setQuickTestTicker(prev => ({ ...prev, [strat.id]: symbol }))}
+                                  className="text-[9px] font-mono bg-white/5 hover:bg-brand-500/10 border border-white/10 hover:border-brand-500/20 text-gray-400 hover:text-brand-300 px-1.5 py-0.5 rounded transition-all"
+                                >
+                                  + {symbol}
+                                </button>
+                              ))}
+                            </div>
+                            {(() => {
+                              const displayResults = stratResults || (strat.avg_cagr !== undefined ? {
+                                total_return_pct: strat.total_return_pct,
+                                cagr: strat.avg_cagr,
+                                sharpe_ratio: strat.avg_sharpe,
+                                win_rate: strat.avg_win_rate,
+                                equity_curve: strat.equity_curve,
+                                isBenchmark: true,
+                                benchmark_tickers: strat.benchmark_tickers
+                              } : null)
+
+                              if (!displayResults) return null
+
+                              return (
+                                <div className="pt-2.5 border-t border-white/[0.04] space-y-2.5 animate-slide-up">
+                                  <div className="flex items-center justify-between text-[9px] font-mono">
+                                    <span className="text-gray-500 font-bold uppercase tracking-wider">
+                                      {displayResults.isBenchmark ? 'Benchmark Performance' : 'Custom Returns Profile'}
+                                    </span>
+                                    <span className={`font-bold ${displayResults.total_return_pct >= 0 ? 'text-brand-400' : 'text-red-400'}`}>
+                                      {displayResults.total_return_pct >= 0 ? '+' : ''}{displayResults.total_return_pct}%
+                                    </span>
+                                  </div>
+
+                                  {/* Micro Sparkline Chart */}
+                                  {displayResults.equity_curve && displayResults.equity_curve.length > 0 && (
+                                    <div className="h-12 w-full relative rounded-lg overflow-hidden bg-black/20 border border-white/[0.02]">
+                                      <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={displayResults.equity_curve} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+                                          <defs>
+                                            <linearGradient id={`gradient-${strat.id}`} x1="0" y1="0" x2="0" y2="1">
+                                              <stop offset="5%" stopColor={displayResults.total_return_pct >= 0 ? "#10b981" : "#f43f5e"} stopOpacity={0.15}/>
+                                              <stop offset="95%" stopColor={displayResults.total_return_pct >= 0 ? "#10b981" : "#f43f5e"} stopOpacity={0.0}/>
+                                            </linearGradient>
+                                          </defs>
+                                          <Area
+                                            type="monotone"
+                                            dataKey="equity"
+                                            stroke={displayResults.total_return_pct >= 0 ? "#10b981" : "#f43f5e"}
+                                            strokeWidth={1}
+                                            fillOpacity={1}
+                                            fill={`url(#gradient-${strat.id})`}
+                                            dot={false}
+                                          />
+                                          <Tooltip
+                                            content={({ active, payload }) => {
+                                              if (active && payload && payload.length) {
+                                                const data = payload[0].payload
+                                                return (
+                                                  <div className="bg-[#0a0a0c] border border-white/10 px-2 py-1 rounded text-[8px] font-mono text-white shadow-2xl">
+                                                    <div className="text-gray-500">{data.date}</div>
+                                                    <div>Equity: <span className="font-bold text-white">${data.equity?.toLocaleString()}</span></div>
+                                                  </div>
+                                                )
+                                              }
+                                              return null
+                                            }}
+                                          />
+                                        </AreaChart>
+                                      </ResponsiveContainer>
+                                    </div>
+                                  )}
+
+                                  {/* Multi-Metric Grid */}
+                                  <div className="grid grid-cols-3 gap-1.5 text-[9px] font-mono text-gray-400">
+                                    <div className="bg-white/[0.01] border border-white/[0.03] p-1.5 rounded flex flex-col">
+                                      <span className="text-gray-500 text-[8px] uppercase tracking-wide">CAGR</span>
+                                      <strong className={`mt-0.5 text-xs ${displayResults.cagr >= 0 ? 'text-brand-300' : 'text-red-400'}`}>
+                                        {displayResults.cagr}%
+                                      </strong>
+                                    </div>
+                                    
+                                    <div className="bg-white/[0.01] border border-white/[0.03] p-1.5 rounded flex flex-col">
+                                      <span className="text-gray-500 text-[8px] uppercase tracking-wide">Sharpe</span>
+                                      <div className="flex items-center gap-1 mt-0.5">
+                                        <strong className="text-white text-xs">{displayResults.sharpe_ratio}</strong>
+                                        <span className={`text-[6px] font-bold px-0.5 rounded ${
+                                          displayResults.sharpe_ratio > 2.0 
+                                            ? 'bg-brand-500/20 text-brand-300' 
+                                            : displayResults.sharpe_ratio > 1.0 
+                                              ? 'bg-blue-500/20 text-blue-300' 
+                                              : 'bg-white/5 text-gray-500'
+                                        }`}>
+                                          {displayResults.sharpe_ratio > 2.0 ? 'EXC' : displayResults.sharpe_ratio > 1.0 ? 'GOOD' : 'SUB'}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <div className="bg-white/[0.01] border border-white/[0.03] p-1.5 rounded flex flex-col">
+                                      <span className="text-gray-500 text-[8px] uppercase tracking-wide">Win Rate</span>
+                                      <strong className="mt-0.5 text-white text-xs">{displayResults.win_rate}%</strong>
+                                    </div>
+                                  </div>
+
+                                  {displayResults.isBenchmark && (
+                                    <div className="text-[7.5px] text-gray-500 font-mono italic">
+                                      * Computed dynamically using: {displayResults.benchmark_tickers.join(', ')}
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })()}
+                          </div>
+
+                          {/* Upvotes & Builder Loading */}
+                          <div className="border-t border-white/[0.03] pt-3 space-y-3">
+                            <div className="flex items-center justify-between text-[9px] text-gray-500 font-mono">
+                              <span>By: <strong>{strat.creator_name}</strong></span>
+                              <span>Upvotes: <strong>{strat.upvotes || 0}</strong></span>
+                            </div>
+
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleUpvote(strat.id)}
+                                className="flex items-center gap-1 px-3 py-2 rounded-xl bg-white/5 hover:bg-brand-500/10 border border-white/10 hover:border-brand-500/20 text-gray-300 hover:text-brand-300 transition-all font-mono font-bold text-xs"
+                              >
+                                <ThumbsUp size={11} />
+                                <span>{strat.upvotes || 0}</span>
+                              </button>
+
+                              <button 
+                                onClick={() => loadStrategyFromMarketplace(strat)}
+                                className="flex-1 flex items-center justify-center gap-1 p-2 rounded-xl bg-brand-500/10 hover:bg-brand-500/20 border border-brand-500/25 text-brand-300 font-bold text-xs transition-all duration-200"
+                              >
+                                Load Builder <ChevronRight size={12} />
+                              </button>
+                            </div>
+                          </div>
+
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
             </div>
           )}
 
