@@ -153,7 +153,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               Desktop Console Required
             </h1>
             <p className="text-gray-400 text-xs leading-relaxed max-w-sm mx-auto">
-              This terminal contains advanced trading graphics, Monte Carlo simulator engines, and ML indicators that are incompatible with small mobile screens.
+              Please switch to a bigger screen or desktop screen for viewing. This terminal contains advanced quantitative charts, Monte Carlo simulator engines and ML models optimized exclusively for large display resolutions.
             </p>
           </div>
 
