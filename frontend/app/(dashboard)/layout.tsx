@@ -2,10 +2,23 @@
 import { useState, useEffect } from 'react'
 import Sidebar from '@/components/ui/Sidebar'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
+import { LineChart, Cpu, Activity } from 'lucide-react'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuthGuard()
   const [loading, setLoading] = useState(true)
+  const [windowWidth, setWindowWidth] = useState<number | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth)
+      setIsMobile(window.innerWidth < 720)
+    }
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   useEffect(() => {
     if (!authLoading) {
@@ -94,6 +107,73 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             />
           </div>
         </div>
+      </div>
+    )
+  }
+
+  if (windowWidth !== null && isMobile) {
+    return (
+      <div className="min-h-screen bg-black text-white relative flex flex-col justify-between overflow-y-auto selection:bg-brand/35 selection:text-white font-sans antialiased">
+        <div className="absolute inset-0 pointer-events-none z-0">
+          <div className="absolute top-[-10%] left-[10%] w-[250px] h-[250px] rounded-full bg-brand-500/10 blur-[100px] opacity-75" />
+          <div className="absolute bottom-[10%] right-[10%] w-[350px] h-[350px] rounded-full bg-blue-500/10 blur-[130px] opacity-75" />
+        </div>
+
+        {/* Header */}
+        <header className="z-10 px-6 py-4 border-b border-white/5 backdrop-blur-md bg-black/35 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-brand-500/10 border border-brand-500/30 flex items-center justify-center">
+              <LineChart className="w-3.5 h-3.5 text-brand-500" />
+            </div>
+            <span className="font-bold text-sm tracking-tight font-mono text-gray-200">
+              STOCKSENTINEL
+            </span>
+          </div>
+        </header>
+
+        {/* Blocker Content */}
+        <main className="flex-1 flex flex-col items-center justify-center p-6 text-center z-10 gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 shrink-0">
+            <Cpu className="w-6 h-6 animate-pulse" />
+          </div>
+
+          <div className="space-y-1.5 shrink-0">
+            <h1 className="text-2xl font-black font-mono tracking-tight text-white uppercase">
+              Desktop Workstation Required
+            </h1>
+            <p className="text-gray-400 text-xs leading-relaxed max-w-sm mx-auto">
+              This terminal contains advanced trading graphics, Monte Carlo simulator engines, and ML indicators that are incompatible with small mobile screens.
+            </p>
+          </div>
+
+          {/* Metrics Telemetry Box */}
+          <div className="w-full max-w-xs card font-mono text-[10px] text-gray-400 border border-white/5 bg-black/60 p-4 rounded-xl flex flex-col gap-1.5 text-left shadow-lg shrink-0">
+            <p className="text-gray-500 font-bold border-b border-white/5 pb-1 mb-1.5 flex items-center gap-1.5">
+              <Activity className="w-3 h-3 text-red-500" /> SCREEN RESOLUTION ERROR
+            </p>
+            <p>REQUIRED_RESOLUTION : &gt;= 720px width</p>
+            <p>CURRENT_RESOLUTION  : <span className="text-red-400 font-bold">{windowWidth}px width</span></p>
+            <p>RESTRICTION_STATE  : <span className="text-red-400 font-bold">TERMINAL_HALTED</span></p>
+            <p className="border-t border-white/5 pt-1.5 mt-1.5 text-gray-500 text-[9.5px]">
+              Please switch to a desktop browser or rotate your device to landscape to establish telemetry access.
+            </p>
+          </div>
+
+          {/* Architect/Author Telemetry Box */}
+          <div className="w-full max-w-xs card font-mono text-[9px] text-gray-500 border border-white/5 bg-black/60 p-3.5 rounded-xl flex flex-col gap-1.5 text-left shadow-lg shrink-0">
+            <p className="text-gray-400 font-bold border-b border-white/5 pb-1 mb-1 uppercase tracking-wider">
+              System Architect Telemetry
+            </p>
+            <p>AUTHOR_NAME : Ujjwal Saini</p>
+            <p>CLASSIFY   : Founder & Lead Engineer</p>
+            <p>PORTFOLIO  : <a href="https://ujjwalsaini.vercel.app" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">ujjwalsaini.vercel.app</a></p>
+            <p>GITHUB     : <a href="https://github.com/UjjwalSaini07" target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">github/UjjwalSaini07</a></p>
+          </div>
+        </main>
+
+        <footer className="z-10 py-3 border-t border-white/5 px-6 text-center text-[9px] text-gray-600 font-mono shrink-0 uppercase tracking-widest">
+          © 2026 STOCKSENTINEL_SYSTEM // VIEWPORT_CHECK_FAILURE
+        </footer>
       </div>
     )
   }
