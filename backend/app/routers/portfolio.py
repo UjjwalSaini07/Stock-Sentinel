@@ -53,6 +53,20 @@ async def remove_from_portfolio(ticker: str, user=Depends(get_current_user)):
 @router.post("/telegram")
 async def link_telegram(body: TelegramLinkRequest, user=Depends(get_current_user)):
     db = get_db()
+    
+    # If any field is empty, treat as disconnect/clear credentials request
+    if not body.chat_id.strip() or not body.bot_token.strip():
+        await db.users.update_one(
+            {"_id": user["_id"]},
+            {"$set": {
+                "telegram_chat_id": None,
+                "telegram_bot_token": None,
+                "telegram_bot_username": None,
+                "telegram_bot_name": None
+            }}
+        )
+        return {"message": "Telegram disconnected successfully"}
+        
     import httpx
     
     # Validate token and get bot username/first_name from Telegram getMe endpoint
