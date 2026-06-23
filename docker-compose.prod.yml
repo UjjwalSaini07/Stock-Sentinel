@@ -7,17 +7,14 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    restart: unless-stopped
+    restart: always
 
   backend:
     build:
       context: ./backend
-      target: development
+      target: production
     ports:
       - "8000:8000"
-    volumes:
-      - ./backend:/app
-      - /app/venv  # Prevents overriding container's virtualenv with host files
     env_file:
       - ./backend/.env
     environment:
@@ -26,16 +23,13 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - redis
-    restart: unless-stopped
+    restart: always
 
   telegram-bot:
     build:
       context: ./backend
-      target: development
+      target: production
     command: python -m app.services.telegram_bot
-    volumes:
-      - ./backend:/app
-      - /app/venv
     env_file:
       - ./backend/.env
     environment:
@@ -45,24 +39,20 @@ services:
     depends_on:
       - redis
       - backend
-    restart: unless-stopped
+    restart: always
 
   frontend:
     build:
       context: ./frontend
-      target: development
+      target: production
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+        - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL:-ws://localhost:8000}
     ports:
       - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules  # Prevents overriding container node_modules
-      - /app/.next         # Prevents overriding container Next.js build cache
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-      - NEXT_PUBLIC_WS_URL=ws://localhost:8000
     depends_on:
       - backend
-    restart: unless-stopped
+    restart: always
 
 volumes:
   redis_data:
