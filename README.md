@@ -1,11 +1,13 @@
-# StockSentinel — Personalised Stock Intelligence Agent
+# StockSentinel — Institutional-Grade Stock Intelligence Agent
 
-[![Stack](https://img.shields.io/badge/Stack-FastAPI%20%7C%20Next.js%20%7C%20Redis%20%7C%20MongoDB-blue?style=flat-glowing)](#tech-stack)
-[![AI Engine](https://img.shields.io/badge/AI-Groq%20Llama%203.3-orange?logo=groq&style=flat-glowing)](#ai-agentic-forecasting)
-[![Telegram](https://img.shields.io/badge/Bot-Telegram%20Alerts-0088cc?logo=telegram&style=flat-glowing)](#telegram-alerts-configuration)
-[![License](https://img.shields.io/badge/License-MIT-green?style=flat-glowing)](#license)
+[![Stack](https://img.shields.io/badge/Stack-FastAPI%20%7C%20Next.js%20%7C%20Redis%20%7C%20MongoDB-blue?style=flat)](#technology-stack)
+[![AI Engine](https://img.shields.io/badge/AI-Groq%20Llama%203.3-orange?logo=groq&style=flat)](#core-feature-matrix)
+[![Telegram](https://img.shields.io/badge/Bot-Telegram%20Alerts-0088cc?logo=telegram&style=flat)](#telegram-alerts-configuration)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat)](#license)
 
 StockSentinel is a production-grade personal wealth-tracking intelligence agent. Built on top of an automated fundamental data scraper, it integrates real-time equity analysis powered by **Groq AI (Llama 3.3)**, calculates **live portfolio Value-at-Risk (VaR 95%)**, conducts **technical RSI-14 / SMA-50 screeners**, and triggers **rebalancing recommendations** through a rules-based investment decision matrix.
+
+All pricing outputs default to **Indian Rupees (₹)**. For global assets, the USD or native local currency price is displayed alongside as a reference.
 
 
 ## 1. System Architecture
@@ -14,50 +16,58 @@ StockSentinel is designed with a decoupled layout. The fundamental scraping pipe
 
 ```mermaid
 graph TD
-    subgraph Frontend [Next.js 14 Web Application]
-        FE[User Interface App]
-        FE_D[Dashboard: Portfolio & Optimization]
-        FE_W[Watchlist: Live Technicals]
-        FE_S[Stock Deep Dive: Indicators]
-        FE_A[Alert Center]
-      	FE_L[Candlestick Motion Loader]
+    subgraph Client ["Frontend App (Rupee Default)"]
+        FE_D[Dashboard]
+        FE_W[Watchlist]
+        FE_INTEL[Market Intelligence]
+        FE_CO[Copilot AI]
+        FE_QL[Quant Lab]
     end
 
-    subgraph Backend [FastAPI Application Server]
-        BE[API Router / JWT Auth]
-        BE_WS[WebSocket Price Broadcast]
-        BE_AC[Alert Check Worker]
-        BE_AI[Groq AI Agent Engine]
+    subgraph Server ["FastAPI Server"]
+        BE_GW[API Gateway & Auth]
+        BE_INTEL[Intel Service]
+        BE_CO[Copilot Engine]
+        BE_QL[Quant Engine]
+        BE_AC[Alert Worker]
     end
 
-    subgraph Storage [Caching & Persistence Layer]
-        MG[(MongoDB Database)]
+    subgraph Storage ["Cache & Database"]
         RD[(Redis Cache)]
+        MG[(MongoDB Database)]
     end
 
-    subgraph External [Data & Notifications]
-        AP[Apify Scraper Actor]
-        TG((Telegram Bot API))
-        GQ((Groq LLM Service))
+    subgraph External ["External Services"]
+        AP[Apify Scraper]
+        YF[Yahoo Finance API]
+        GQ[Groq AI API]
+        TG[Telegram API]
     end
 
-    FE -->|REST API| BE
-    FE -->|WebSockets| BE_WS
-    BE -->|Read/Write User Portfolios| MG
-    BE -->|Cache Miss Cache Store| RD
-    BE_AC -->|Poll Prices| RD
-    BE_AC -->|Dispatch Notifications| TG
-    BE_AI <-->|Query LLM| GQ
-    AP -->|Upsert Raw Stock Metrics| MG
-    MG -.->|Sync Read| RD
+    %% Routing
+    FE_D & FE_W & FE_INTEL & FE_CO & FE_QL -->|HTTP / JWT| BE_GW
+    BE_GW --> BE_INTEL & BE_CO & BE_QL
+    
+    %% Storage access
+    BE_GW --> MG
+    BE_INTEL & BE_QL --> RD
+    BE_AC --> RD
+    MG -.->|Cache Sync| RD
+
+    %% External APIs
+    AP -->|Upsert Raw Data| MG
+    BE_INTEL -->|Fetch Markets| YF
+    BE_CO -->|Trigger Forecasts| GQ
+    BE_AC -->|Dispatch DMs| TG
 ```
 
 
 ## 2. Core Feature Matrix
 
-* **🔮 AI Forecast & Analysis (Groq Llama 3.3)**: Generates 1-year target prices, upside percentages, growth catalysts, and risk metrics using live financials and news sentiment, cached for 2 hours with MongoDB/Redis layers.
+* **🔮 AI Forecast & Analysis (Groq Llama 3.3)**: Generates 1-year target prices, upside percentages, growth catalysts, and risk metrics using live financials and news sentiment.
+* **📈 Bloomberg-Style Market Intelligence**: Real-time overview of global indices, commodities, forex, and cryptocurrency. Features economic/corporate calendars, insider block deals, and AI-driven news clustering.
 * **📊 Portfolio Audit & Risk Metrics**: Audits asset-to-portfolio weights against a $40\%$ concentration safety threshold and estimates maximum expected daily losses using a **Value-at-Risk (VaR 95%)** model.
-* **🎲 Sharpe Optimizer & Monte Carlo Forecaster**: Features an interactive CAGR target slider ($8\% - 25\%$) that compares returns against a $5.0\%$ risk-free rate, and simulates 1-year wealth distributions at the 10th, 50th, and 90th percentiles using **Geometric Brownian Motion**.
+* **🎲 Sharpe Optimizer & Monte Carlo Forecaster**: Features an interactive CAGR target slider ($8\% - 25\%$) that compares returns against a $5.0\%$ risk-free rate, and simulates 1-year wealth distributions using **Geometric Brownian Motion**.
 * **⚡ Technical Indicator Screener**: Evaluates the **14-day Relative Strength Index (RSI-14)** (Oversold $\le 30$, Overbought $\ge 70$) and detects bullish/bearish **50-day Simple Moving Average (SMA-50)** breakouts.
 * **🏛️ Rebalancing & Holding Action Matrix**: Recommends holding shifts (**Trim / Buy / Hold**) based on valuation metrics (P/E), company efficiency (ROE/ROCE), portfolio weight, and 52-week price boundaries.
 * **🔔 Live Telegram Price Alerts**: Dispatches instant Telegram direct messages for target price or stop-loss crossovers.
@@ -176,6 +186,7 @@ docker compose up --build
 2. In the StockSentinel Web UI, navigate to **Alerts → Link Telegram Bot** to fetch your activation command (e.g. `/start <auth_token>`).
 3. Send this activation command to your bot on Telegram.
 4. Your account is linked! The bot will now DM you live notifications for target price or stop-loss crossovers.
+
 
 ## 9. Comprehensive Documentation Index
 

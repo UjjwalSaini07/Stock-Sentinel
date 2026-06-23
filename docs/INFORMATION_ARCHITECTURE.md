@@ -77,7 +77,7 @@ Stores historical prices for chart rendering.
 
 ## 2. Redis Caching Layer
 
-Redis acts as a high-performance buffer between MongoDB and client REST requests.
+Redis acts as a high-performance buffer between MongoDB and client REST requests, as well as an orchestrator for session states.
 
 ### Key Schemas & TTL Policy
 
@@ -86,6 +86,12 @@ Redis acts as a high-performance buffer between MongoDB and client REST requests
 | `stock:{ticker}` | String (JSON) | 600s (10m) | Cached fundamentals, updated on cache miss from DB. |
 | `alerts:user:{user_id}` | Set | 300s (5m) | Active alert configs for specific users to optimize alert checking. |
 | `websocket:price:{ticker}` | String | None | Holds the latest streaming price for low-latency distribution. |
+| `intel:markets` | String (JSON) | 60s (1m) | Cached global indices, commodities, forex, and crypto pricing. |
+| `intel:sectors` | String (JSON) | 300s (5m) | Sector rotation relative strength matrices. |
+| `intel:news` | String (JSON) | 600s (10m) | AI sentiment analysis and clustered news event payloads. |
+| `intel:briefing` | String (JSON) | 3600s (1h) | Dynamic market overview briefing summary. |
+| `intel:yields` | String (JSON) | 120s (2m) | Yield curves and money rates. |
+| `intel:blockdeals` | String (JSON) | 300s (5m) | Institutional block trade records. |
 
 
 ## 3. Frontend Routing (Next.js 14 App Router)
@@ -105,7 +111,13 @@ frontend/app/
 │   │   └── page.tsx           # Tracked stock list with WebSocket price tickers
 │   ├── stock/[ticker]/
 │   │   └── page.tsx           # Deep dive into company fundamentals & technical signals
-│   └── alerts/
-│       └── page.tsx           # Alert creation, target tracker, & history ledger
+│   ├── alerts/
+│   │   └── page.tsx           # Alert creation, target tracker, & history ledger
+│   ├── intel/
+│   │   └── page.tsx           # Market Intelligence Center (indices, calendars, insider buys)
+│   ├── copilot/
+│   │   └── page.tsx           # Copilot Chat: Personalised investment assistant
+│   └── quant/
+│       └── page.tsx           # Quant Lab Strategy Backtester & Monte Carlo simulator
 └── layout.tsx                 # Toast context provider & HTML wrapper
 ```

@@ -22,38 +22,49 @@ Your existing `StockScrapper.py` (Apify actor):
 
 ```mermaid
 graph TD
-    subgraph Frontend [Next.js 14 Web Application]
-        FE[User Interface App]
-        FE_D[Dashboard: Portfolio & Optimization]
-        FE_W[Watchlist: Live Technicals]
-        FE_S[Stock Deep Dive: Indicators]
-        FE_A[Alert Center]
+    subgraph Client ["Frontend App (Rupee Default)"]
+        FE_D[Dashboard]
+        FE_W[Watchlist]
+        FE_INTEL[Market Intelligence]
+        FE_CO[Copilot AI]
+        FE_QL[Quant Lab]
     end
 
-    subgraph Backend [FastAPI Application Server]
-        BE[API Router / JWT Auth]
-        BE_WS[WebSocket Price Broadcast]
-        BE_AC[Alert Check Worker]
+    subgraph Server ["FastAPI Server"]
+        BE_GW[API Gateway & Auth]
+        BE_INTEL[Intel Service]
+        BE_CO[Copilot Engine]
+        BE_QL[Quant Engine]
+        BE_AC[Alert Worker]
     end
 
-    subgraph Storage [Caching & Persistence Layer]
-        MG[(MongoDB Database)]
+    subgraph Storage ["Cache & Database"]
         RD[(Redis Cache)]
+        MG[(MongoDB Database)]
     end
 
-    subgraph External [Data & Notifications]
-        AP[Apify Scraper Actor]
-        TG((Telegram Bot API))
+    subgraph External ["External Services"]
+        AP[Apify Scraper]
+        YF[Yahoo Finance API]
+        GQ[Groq AI API]
+        TG[Telegram API]
     end
 
-    FE -->|REST API| BE
-    FE -->|WebSockets| BE_WS
-    BE -->|Read/Write User Portfolios| MG
-    BE -->|Cache Miss Cache Store| RD
-    BE_AC -->|Poll Prices| RD
-    BE_AC -->|Dispatch Notifications| TG
-    AP -->|Upsert Raw Stock Metrics| MG
-    MG -.->|Sync Read| RD
+    %% Routing
+    FE_D & FE_W & FE_INTEL & FE_CO & FE_QL -->|HTTP / JWT| BE_GW
+    BE_GW --> BE_INTEL & BE_CO & BE_QL
+    
+    %% Storage access
+    BE_GW --> MG
+    BE_INTEL & BE_QL --> RD
+    BE_AC --> RD
+    MG -.->|Cache Sync| RD
+
+    %% External APIs
+    AP -->|Upsert Raw Data| MG
+    BE_INTEL -->|Fetch Markets| YF
+    BE_CO -->|Trigger Forecasts| GQ
+    BE_AC -->|Dispatch DMs| TG
 ```
 
 
@@ -447,3 +458,21 @@ Once core is live, extend with:
 * **Weekly digest** — Telegram bot sends Sunday portfolio summary and performance metrics.
 * **Multi-exchange** — extend scraper to BSE tickers.
 * **Paper trading mode** — simulate trades without real money.
+
+
+## 16. Market Intelligence Center
+
+Added a Bloomberg-style Institutional Terminal providing global macro feeds, corporate calendars, and news event clusters.
+- **Global Market Overview**: Live feeds for indices, commodities, currencies, and cryptocurrencies retrieved from the Yahoo Finance API via `intel_service.py`.
+- **Sector Rotation Analysis**: Mapped 1-month relative strength performance vs. Nifty 50 and 1D momentum to track leading/improving/lagging/weakening sectors.
+- **Economic & Corporate Calendars**: Upcoming macro releases (CPI, interest rates, GDP) and stock corporate actions (dividends, splits, earnings).
+- **News Intelligence Engine**: Real-time news clustering using AI-driven sentiment scoring (via Groq API) and market impact estimation.
+- **Insider Trading & Block Deals**: Aggregates bulk exchange transactions and corporate insider buying/selling activities.
+
+
+## 17. Multi-Currency Default Rupee (₹) Display Engine
+
+Standardised all pricing display across user dashboards, portfolios, backtesters, and market trackers to default to Indian Rupees (`₹`).
+- **Dynamic Conversion**: For foreign USD/local-denominated assets (like Bitcoin, S&P 500, or Gold), prices are dynamically converted using the live `USDINR=X` exchange rate.
+- **Dual-Currency Reference**: The native local currency value (e.g. `$65,000.00` or `£7,200.00`) is displayed alongside/underneath the primary Rupee price.
+- **Indian Stock Protection**: Tickers ending in `.NS` or `.BO` (or standard Indian stock names) are correctly classified as already INR-denominated, displaying their raw prices directly in Rupees and converting to USD only for reference display.
