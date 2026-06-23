@@ -778,7 +778,7 @@ export default function QuantLabPage() {
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label className="text-gray-500 font-semibold">Initial Capital</label>
+                        <label className="text-gray-500 font-semibold">Initial Capital (₹)</label>
                         <input 
                           type="number" 
                           value={btCapital} 
@@ -915,7 +915,7 @@ export default function QuantLabPage() {
                     {/* Performance metrics grid */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                       {[
-                        { label: 'Ending Equity', value: `Rs. ${btResult.final_equity.toLocaleString()}`, color: 'text-brand-300' },
+                        { label: 'Ending Equity', value: `₹${btResult.final_equity.toLocaleString()}`, color: 'text-brand-300' },
                         { label: 'Total Return', value: `${btResult.total_return_pct}%`, color: btResult.total_return_pct >= 0 ? 'text-brand-400' : 'text-red-400' },
                         { label: 'CAGR', value: `${btResult.cagr}%`, color: btResult.cagr >= 0 ? 'text-brand-400' : 'text-red-400' },
                         { label: 'Max Drawdown', value: `-${btResult.max_drawdown}%`, color: 'text-red-400' },
@@ -1051,8 +1051,8 @@ export default function QuantLabPage() {
                               <th className="pb-2">Action</th>
                               <th className="pb-2">Execution Price</th>
                               <th className="pb-2">Quantity</th>
-                              <th className="pb-2 text-right">Value (Rs.)</th>
-                              <th className="pb-2 text-right">PnL (Rs.)</th>
+                              <th className="pb-2 text-right">Value (₹)</th>
+                              <th className="pb-2 text-right">PnL (₹)</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1064,11 +1064,11 @@ export default function QuantLabPage() {
                                     {t.type}
                                   </span>
                                 </td>
-                                <td className="py-2.5 font-mono">Rs. {t.price.toLocaleString()}</td>
+                                <td className="py-2.5 font-mono">₹{t.price.toLocaleString()}</td>
                                 <td className="py-2.5 font-mono">{t.quantity}</td>
-                                <td className="py-2.5 text-right font-mono">Rs. {t.value.toLocaleString()}</td>
+                                <td className="py-2.5 text-right font-mono">₹{t.value.toLocaleString()}</td>
                                 <td className={`py-2.5 text-right font-mono font-bold ${t.profit !== undefined ? (t.profit >= 0 ? 'text-brand-400' : 'text-red-400') : 'text-gray-500'}`}>
-                                  {t.profit !== undefined ? `Rs. ${t.profit.toLocaleString()}` : '-'}
+                                  {t.profit !== undefined ? `₹${t.profit.toLocaleString()}` : '-'}
                                 </td>
                               </tr>
                             ))}
@@ -1513,7 +1513,7 @@ export default function QuantLabPage() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-gray-500 font-semibold">Sim Capital</label>
+                      <label className="text-gray-500 font-semibold">Sim Capital (₹)</label>
                       <input 
                         type="number" 
                         value={mcCapital} 
@@ -1648,8 +1648,8 @@ export default function QuantLabPage() {
                             { label: 'Stressed Volatility', value: `${stressResult.stressed_metrics.annualized_volatility}%`, color: 'text-purple-400' },
                             { label: 'Stressed Max Drawdown', value: `-${stressResult.stressed_metrics.max_drawdown}%`, color: 'text-red-400' },
                             { label: 'Stressed Sharpe', value: stressResult.stressed_metrics.sharpe_ratio, color: 'text-amber-300' },
-                            { label: '95% Value at Risk (VaR)', value: `Rs. ${Math.round(stressResult.stressed_metrics.var_95_pct * mcCapital / 100).toLocaleString()} (${stressResult.stressed_metrics.var_95_pct}%)`, color: 'text-red-400', span: 'col-span-2' },
-                            { label: '95% Expected Shortfall (ES)', value: `Rs. ${Math.round(stressResult.stressed_metrics.es_95_pct * mcCapital / 100).toLocaleString()} (${stressResult.stressed_metrics.es_95_pct}%)`, color: 'text-red-400', span: 'col-span-2' }
+                            { label: '95% Value at Risk (VaR)', value: `₹${Math.round(stressResult.stressed_metrics.var_95_pct * mcCapital / 100).toLocaleString()} (${stressResult.stressed_metrics.var_95_pct}%)`, color: 'text-red-400', span: 'col-span-2' },
+                            { label: '95% Expected Shortfall (ES)', value: `₹${Math.round(stressResult.stressed_metrics.es_95_pct * mcCapital / 100).toLocaleString()} (${stressResult.stressed_metrics.es_95_pct}%)`, color: 'text-red-400', span: 'col-span-2' }
                           ].map((item, idx) => (
                             <div key={idx} className={`p-3 bg-white/[0.01] border border-white/5 rounded-xl space-y-1 ${item.span || ''}`}>
                               <div className="text-[10px] text-gray-500 font-semibold uppercase">{item.label}</div>
@@ -2011,7 +2011,7 @@ export default function QuantLabPage() {
                                                 return (
                                                   <div className="bg-[#0a0a0c] border border-white/10 px-2 py-1 rounded text-[8px] font-mono text-white shadow-2xl">
                                                     <div className="text-gray-500">{data.date}</div>
-                                                    <div>Equity: <span className="font-bold text-white">${data.equity?.toLocaleString()}</span></div>
+                                                    <div>Equity: <span className="font-bold text-white">₹{data.equity?.toLocaleString()}</span></div>
                                                   </div>
                                                 )
                                               }
