@@ -102,8 +102,8 @@ async def check_all_alerts():
                     
                     try:
                         user = await db.users.find_one({"_id": ObjectId(user_id)})
-                        if user and user.get("telegram_chat_id"):
-                            bot_token = user.get("telegram_bot_token")
+                        if user and user.get("telegram_chat_id") and user.get("telegram_bot_token"):
+                            bot_token = user["telegram_bot_token"]
                             if alert_type == "price":
                                 await notify_alert_triggered(user_id, ticker, price, alert_type_label, target_level)
                             else:

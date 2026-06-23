@@ -3,16 +3,13 @@ from app.config import settings
 from app.database import get_db
 from bson import ObjectId
 
-TELEGRAM_API = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}"
-
 async def send_telegram_message(chat_id: str, message: str, bot_token: str = None):
     """Send a message to a Telegram chat."""
-    token = bot_token or settings.TELEGRAM_BOT_TOKEN
-    if not token:
-        print(f"[Telegram] No token set. Would send: {message}")
+    if not bot_token:
+        print(f"[Telegram] No bot token provided. Skipping message: {message}")
         return
     
-    api_url = f"https://api.telegram.org/bot{token}/sendMessage"
+    api_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.post(
@@ -28,7 +25,7 @@ async def notify_alert_triggered(user_id: str, ticker: str, price: float, alert_
     db = get_db()
     user = await db.users.find_one({"_id": ObjectId(user_id)})
     
-    if not user or not user.get("telegram_chat_id"):
+    if not user or not user.get("telegram_chat_id") or not user.get("telegram_bot_token"):
         return
     
     emoji = "🎯" if alert_type == "target" else "🔴"
@@ -42,7 +39,7 @@ async def notify_alert_triggered(user_id: str, ticker: str, price: float, alert_
         f"_Check your portfolio now!_"
     )
     
-    await send_telegram_message(user["telegram_chat_id"], message, user.get("telegram_bot_token"))
+    await send_telegram_message(user["telegram_chat_id"], message, user["telegram_bot_token"])
 
 async def send_portfolio_summary(chat_id: str, portfolio_data: list, bot_token: str = None):
     """Send weekly portfolio summary."""
