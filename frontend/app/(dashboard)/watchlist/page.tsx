@@ -160,7 +160,7 @@ function StockInsightsModal({ stock, onClose, onInvest }: { stock: StockData; on
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl bg-[#090d16]/95 border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-scale-up">
+      <div className="w-full max-w-2xl bg-black/95 border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-scale-up">
         {/* Header */}
         <div className="p-5 border-b border-white/5 flex justify-between items-start">
           <div>
@@ -440,7 +440,7 @@ function QuickAlertModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm bg-[#090d16]/95 border border-white/10 rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4 animate-scale-up">
+      <form onSubmit={handleSubmit} className="w-full max-w-sm bg-black/95 border border-white/10 rounded-2xl shadow-2xl overflow-hidden p-6 space-y-4 animate-scale-up">
         <div className="flex justify-between items-start">
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-1.5">
@@ -513,7 +513,7 @@ function StockCompareModal({ stocks, onClose }: { stocks: StockData[]; onClose: 
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl bg-[#090d16]/95 border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-scale-up">
+      <div className="w-full max-w-4xl bg-black/95 border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-scale-up">
         {/* Header */}
         <div className="p-5 border-b border-white/5 flex justify-between items-center">
           <div>
