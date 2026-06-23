@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import Sidebar from '@/components/ui/Sidebar'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
-import { LineChart, Cpu, Activity } from 'lucide-react'
+import { LineChart, Cpu, Activity, RefreshCw } from 'lucide-react'
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuthGuard()
@@ -10,14 +10,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [windowWidth, setWindowWidth] = useState<number | null>(null)
   const [isMobile, setIsMobile] = useState(false)
 
-  useEffect(() => {
-    const handleResize = () => {
+  const triggerManualCheck = () => {
+    if (typeof window !== 'undefined') {
       setWindowWidth(window.innerWidth)
       setIsMobile(window.innerWidth < 720)
     }
-    handleResize()
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+  }
+
+  useEffect(() => {
+    triggerManualCheck()
+    window.addEventListener('resize', triggerManualCheck)
+    return () => window.removeEventListener('resize', triggerManualCheck)
   }, [])
 
   useEffect(() => {
@@ -114,10 +117,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (windowWidth !== null && isMobile) {
     return (
       <div className="min-h-screen bg-black text-white relative flex flex-col justify-between overflow-y-auto selection:bg-brand/35 selection:text-white font-sans antialiased">
+        {/* Dynamic Background Gradients */}
         <div className="absolute inset-0 pointer-events-none z-0">
           <div className="absolute top-[-10%] left-[10%] w-[250px] h-[250px] rounded-full bg-brand-500/10 blur-[100px] opacity-75" />
           <div className="absolute bottom-[10%] right-[10%] w-[350px] h-[350px] rounded-full bg-blue-500/10 blur-[130px] opacity-75" />
         </div>
+
+        {/* Cyber Grid Pattern */}
+        <div className="absolute inset-0 pointer-events-none opacity-[0.03] z-0" style={{
+          backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
+          backgroundSize: '20px 20px'
+        }} />
 
         {/* Header */}
         <header className="z-10 px-6 py-4 border-b border-white/5 backdrop-blur-md bg-black/35 flex items-center justify-between shrink-0">
@@ -126,20 +136,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <LineChart className="w-3.5 h-3.5 text-brand-500" />
             </div>
             <span className="font-bold text-sm tracking-tight font-mono text-gray-200">
-              STOCKSENTINEL
+              STOCKSENTINEL_WORKSTATION
             </span>
           </div>
         </header>
 
         {/* Blocker Content */}
-        <main className="flex-1 flex flex-col items-center justify-center p-6 text-center z-10 gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 shrink-0">
-            <Cpu className="w-6 h-6 animate-pulse" />
+        <main className="flex-1 flex flex-col items-center justify-center p-6 text-center z-10 gap-5">
+          <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 shrink-0 relative">
+            <div className="absolute inset-0 bg-red-500/20 blur-lg rounded-full animate-pulse" />
+            <Cpu className="w-6 h-6 animate-pulse relative z-10" />
           </div>
 
           <div className="space-y-1.5 shrink-0">
             <h1 className="text-2xl font-black font-mono tracking-tight text-white uppercase">
-              Desktop Workstation Required
+              Desktop Console Required
             </h1>
             <p className="text-gray-400 text-xs leading-relaxed max-w-sm mx-auto">
               This terminal contains advanced trading graphics, Monte Carlo simulator engines, and ML indicators that are incompatible with small mobile screens.
@@ -147,20 +158,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
 
           {/* Metrics Telemetry Box */}
-          <div className="w-full max-w-xs card font-mono text-[10px] text-gray-400 border border-white/5 bg-black/60 p-4 rounded-xl flex flex-col gap-1.5 text-left shadow-lg shrink-0">
-            <p className="text-gray-500 font-bold border-b border-white/5 pb-1 mb-1.5 flex items-center gap-1.5">
-              <Activity className="w-3 h-3 text-red-500" /> SCREEN RESOLUTION ERROR
+          <div className="w-full max-w-xs card border border-red-500/20 bg-black/60 p-4 rounded-xl flex flex-col gap-1.5 text-left shadow-lg shrink-0">
+            <p className="text-red-400 font-bold border-b border-white/5 pb-1 mb-1 flex items-center gap-1.5 font-mono text-[10px]">
+              <Activity className="w-3 h-3 text-red-500 animate-pulse" /> SCREEN RESOLUTION ERROR
             </p>
-            <p>REQUIRED_RESOLUTION : &gt;= 720px width</p>
-            <p>CURRENT_RESOLUTION  : <span className="text-red-400 font-bold">{windowWidth}px width</span></p>
-            <p>RESTRICTION_STATE  : <span className="text-red-400 font-bold">TERMINAL_HALTED</span></p>
-            <p className="border-t border-white/5 pt-1.5 mt-1.5 text-gray-500 text-[9.5px]">
-              Please switch to a desktop browser or rotate your device to landscape to establish telemetry access.
+            <div className="font-mono text-[10px] text-gray-400 space-y-1">
+              <p>REQUIRED_RESOLUTION : &gt;= 720px width</p>
+              <p>CURRENT_RESOLUTION  : <span className="text-red-400 font-bold">{windowWidth}px width</span></p>
+              <p>RESTRICTION_STATE  : <span className="text-red-400 font-bold">TERMINAL_HALTED</span></p>
+            </div>
+            
+            <button 
+              onClick={triggerManualCheck}
+              className="mt-2 w-full py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 hover:border-red-500/50 rounded-lg text-[9px] uppercase font-mono tracking-wider transition-all duration-150 flex items-center justify-center gap-1.5 active:scale-95 text-red-400"
+            >
+              <RefreshCw className="w-3 h-3 animate-[spin_3s_linear_infinite]" /> Re-Evaluate Viewport Telemetry
+            </button>
+          </div>
+
+          {/* System Boot Logs (Hacker / Quant trader feel) */}
+          <div className="w-full max-w-xs card font-mono text-[9px] text-gray-500 border border-white/5 bg-black/60 p-3.5 rounded-xl flex flex-col gap-1.5 text-left shadow-lg shrink-0">
+            <p className="text-gray-400 font-bold border-b border-white/5 pb-1 mb-1 uppercase tracking-wider">
+              System Boot sequence logs
             </p>
+            <p className="text-emerald-500/80">▶ INITIALIZING MONTE_CARLO_GBM... OK</p>
+            <p className="text-emerald-500/80">▶ CLOUD_SYNC_UPSTASH_REDIS... OK</p>
+            <p className="text-emerald-500/80">▶ INGESTING_SCREENER_DATA_LAKE... OK</p>
+            <p className="text-red-400 animate-pulse">▶ TELEMETRY_CONSTRAINT... FAIL [W_UNDERFLOW]</p>
           </div>
 
           {/* Architect/Author Telemetry Box */}
-          <div className="w-full max-w-xs card font-mono text-[9px] text-gray-500 border border-white/5 bg-black/60 p-3.5 rounded-xl flex flex-col gap-1.5 text-left shadow-lg shrink-0">
+          <div className="w-full max-w-xs card font-mono text-[9px] text-gray-500 border border-brand-500/20 bg-black/60 p-3.5 rounded-xl flex flex-col gap-1.5 text-left shadow-lg shrink-0">
             <p className="text-gray-400 font-bold border-b border-white/5 pb-1 mb-1 uppercase tracking-wider">
               System Architect Telemetry
             </p>
