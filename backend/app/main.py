@@ -73,6 +73,7 @@ async def home():
         "author": {
             "name": "Ujjwal Saini",
             "github": "https://github.com/UjjwalSaini07",
+            "authorurl": "https://ujjwalsaini.vercel.app/"
         },
         "documentation": "/docs",
         "currency_standard": "Indian Rupees (₹) default, with dual-currency USD/native reference support",
