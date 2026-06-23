@@ -6,7 +6,7 @@ import { StockData } from '@/types'
 import toast from 'react-hot-toast'
 import AddStockModal from '@/components/portfolio/AddStockModal'
 import { useAuthStore } from '@/lib/store'
-import { AreaChart, Area, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
+import { AreaChart, Area, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts'
 
 function WatchlistSparkline({ ticker, positive }: { ticker: string; positive: boolean }) {
   const [sparkData, setSparkData] = useState<any[]>([])
@@ -505,15 +505,217 @@ function QuickAlertModal({
 }
 
 function StockCompareModal({ stocks, onClose }: { stocks: StockData[]; onClose: () => void }) {
-  const chartData = stocks.map(s => ({
-    name: s.ticker,
-    ROCE: s.roce || 0,
-    ROE: s.roe || 0
-  }))
+  const [chartType, setChartType] = useState<'bar' | 'radar'>('radar')
+  const [metricGroup, setMetricGroup] = useState<'efficiency' | 'valuation' | 'technical'>('efficiency')
+  const [showVerdict, setShowVerdict] = useState(true)
+
+  // ── Mathematical Helpers to Check Winners ─────────────────
+  const getWinner = (metric: string) => {
+    if (stocks.length === 0) return []
+    
+    if (metric === 'pe') {
+      const valid = stocks.filter(s => s.stock_pe !== null && s.stock_pe !== undefined && s.stock_pe > 0)
+      if (valid.length === 0) return []
+      const minVal = Math.min(...valid.map(s => s.stock_pe as number))
+      return valid.filter(s => s.stock_pe === minVal).map(s => s.ticker)
+    }
+    
+    if (metric === 'pb') {
+      const valid = stocks.filter(s => s.current_price !== null && s.book_value !== null && s.book_value !== undefined && s.book_value > 0)
+      if (valid.length === 0) return []
+      const pbList = valid.map(s => ({ ticker: s.ticker, pb: (s.current_price || 0) / (s.book_value || 1) }))
+      const minVal = Math.min(...pbList.map(item => item.pb))
+      return pbList.filter(item => item.pb === minVal).map(w => w.ticker)
+    }
+    
+    if (metric === 'roce') {
+      const valid = stocks.filter(s => s.roce !== null && s.roce !== undefined)
+      if (valid.length === 0) return []
+      const maxVal = Math.max(...valid.map(s => s.roce as number))
+      return valid.filter(s => s.roce === maxVal).map(s => s.ticker)
+    }
+    
+    if (metric === 'roe') {
+      const valid = stocks.filter(s => s.roe !== null && s.roe !== undefined)
+      if (valid.length === 0) return []
+      const maxVal = Math.max(...valid.map(s => s.roe as number))
+      return valid.filter(s => s.roe === maxVal).map(s => s.ticker)
+    }
+    
+    if (metric === 'dividend') {
+      const valid = stocks.filter(s => s.dividend_yield !== null && s.dividend_yield !== undefined && s.dividend_yield > 0)
+      if (valid.length === 0) return []
+      const maxVal = Math.max(...valid.map(s => s.dividend_yield as number))
+      return valid.filter(s => s.dividend_yield === maxVal).map(s => s.ticker)
+    }
+    
+    if (metric === 'mcap') {
+      const valid = stocks.filter(s => s.market_cap !== null && s.market_cap !== undefined)
+      if (valid.length === 0) return []
+      const maxVal = Math.max(...valid.map(s => s.market_cap as number))
+      return valid.filter(s => s.market_cap === maxVal).map(s => s.ticker)
+    }
+
+    if (metric === 'rsi') {
+      const valid = stocks.filter(s => s.rsi !== null && s.rsi !== undefined)
+      if (valid.length === 0) return []
+      // Lower RSI is closer to oversold (value pick candidate)
+      const minVal = Math.min(...valid.map(s => s.rsi as number))
+      return valid.filter(s => s.rsi === minVal).map(s => s.ticker)
+    }
+    
+    return []
+  }
+
+  const winners = {
+    pe: getWinner('pe'),
+    pb: getWinner('pb'),
+    roce: getWinner('roce'),
+    roe: getWinner('roe'),
+    dividend: getWinner('dividend'),
+    mcap: getWinner('mcap'),
+    rsi: getWinner('rsi'),
+  }
+
+  // ── Quant Score Engine (Max 18 points) ─────────────────────
+  const calculateQuantScore = (s: StockData) => {
+    let score = 0
+    
+    // P/E Score (Max 3 points)
+    if (s.stock_pe && s.stock_pe > 0) {
+      if (s.stock_pe <= 15) score += 3
+      else if (s.stock_pe <= 25) score += 2
+      else if (s.stock_pe <= 40) score += 1
+    }
+    
+    // P/B Score (Max 3 points)
+    if (s.current_price && s.book_value && s.book_value > 0) {
+      const pb = s.current_price / s.book_value
+      if (pb <= 1.5) score += 3
+      else if (pb <= 3.0) score += 2
+      else if (pb <= 5.0) score += 1
+    }
+    
+    // ROCE Score (Max 4 points)
+    if (s.roce && s.roce > 0) {
+      if (s.roce >= 25) score += 4
+      else if (s.roce >= 18) score += 3
+      else if (s.roce >= 12) score += 2
+      else if (s.roce >= 6) score += 1
+    }
+    
+    // ROE Score (Max 4 points)
+    if (s.roe && s.roe > 0) {
+      if (s.roe >= 20) score += 4
+      else if (s.roe >= 15) score += 3
+      else if (s.roe >= 10) score += 2
+      else if (s.roe >= 5) score += 1
+    }
+    
+    // Dividend Yield Score (Max 2 points)
+    if (s.dividend_yield && s.dividend_yield > 0) {
+      if (s.dividend_yield >= 3.0) score += 2
+      else if (s.dividend_yield >= 1.0) score += 1
+    }
+    
+    // Technical Signals (Max 2 points)
+    if (s.sma_50_signal === 'Bullish') score += 1
+    if (s.rsi_signal === 'Oversold') score += 1
+    else if (s.rsi && s.rsi >= 30 && s.rsi <= 70) score += 0.5
+    
+    return score
+  }
+
+  const scoredStocks = stocks.map(s => {
+    const rawScore = calculateQuantScore(s)
+    const normalizedScore = (rawScore / 18) * 10
+    return {
+      ticker: s.ticker,
+      score: normalizedScore,
+      raw: rawScore,
+      stock: s
+    }
+  }).sort((a, b) => b.score - a.score)
+
+  // ── Compile Chart Data Dynamically ────────────────────────
+  let radarData: any[] = []
+  if (metricGroup === 'efficiency') {
+    radarData = [
+      { subject: 'ROCE (%)', ...stocks.reduce((acc, s) => ({ ...acc, [s.ticker]: s.roce || 0 }), {}) },
+      { subject: 'ROE (%)', ...stocks.reduce((acc, s) => ({ ...acc, [s.ticker]: s.roe || 0 }), {}) },
+      { subject: 'Div Yield (% x10)', ...stocks.reduce((acc, s) => ({ ...acc, [s.ticker]: (s.dividend_yield || 0) * 10 }), {}) }
+    ]
+  } else if (metricGroup === 'valuation') {
+    radarData = [
+      { subject: 'P/E Ratio', ...stocks.reduce((acc, s) => ({ ...acc, [s.ticker]: s.stock_pe || 0 }), {}) },
+      { subject: 'P/B (x10)', ...stocks.reduce((acc, s) => {
+          const pb = s.current_price && s.book_value ? s.current_price / s.book_value : 0
+          return { ...acc, [s.ticker]: pb * 10 }
+        }, {})
+      },
+      { subject: 'EPS (₹ / 2)', ...stocks.reduce((acc, s) => ({ ...acc, [s.ticker]: (s.eps || 0) / 2 }), {}) }
+    ]
+  } else {
+    // Technicals
+    radarData = [
+      { subject: '14-Day RSI', ...stocks.reduce((acc, s) => ({ ...acc, [s.ticker]: s.rsi || 50 }), {}) },
+      { subject: 'SMA-50 Dev (% x5)', ...stocks.reduce((acc, s) => {
+          const dev = s.current_price && s.sma_50 ? ((s.current_price - s.sma_50) / s.sma_50) * 100 : 0
+          return { ...acc, [s.ticker]: Math.max(-10, Math.min(10, dev)) * 5 + 50 }
+        }, {})
+      },
+      { subject: '52W Position (%)', ...stocks.reduce((acc, s) => {
+          let pct = 0
+          if (s.week_52_high && s.week_52_low && s.current_price) {
+            const r = s.week_52_high - s.week_52_low
+            if (r > 0) pct = ((s.current_price - s.week_52_low) / r) * 100
+          }
+          return { ...acc, [s.ticker]: pct }
+        }, {})
+      }
+    ]
+  }
+
+  let barChartData: any[] = []
+  if (metricGroup === 'efficiency') {
+    barChartData = stocks.map(s => ({
+      name: s.ticker,
+      "ROCE (%)": s.roce || 0,
+      "ROE (%)": s.roe || 0,
+      "Div Yield (%)": s.dividend_yield || 0
+    }))
+  } else if (metricGroup === 'valuation') {
+    barChartData = stocks.map(s => {
+      const pb = s.current_price && s.book_value ? s.current_price / s.book_value : 0
+      return {
+        name: s.ticker,
+        "P/E Ratio": s.stock_pe || 0,
+        "P/B Ratio": pb,
+        "EPS (₹)": s.eps || 0
+      }
+    })
+  } else {
+    barChartData = stocks.map(s => {
+      const dev = s.current_price && s.sma_50 ? ((s.current_price - s.sma_50) / s.sma_50) * 100 : 0
+      let pct = 0
+      if (s.week_52_high && s.week_52_low && s.current_price) {
+        const r = s.week_52_high - s.week_52_low
+        if (r > 0) pct = ((s.current_price - s.week_52_low) / r) * 100
+      }
+      return {
+        name: s.ticker,
+        "14-Day RSI": s.rsi || 0,
+        "SMA-50 Dev (%)": parseFloat(dev.toFixed(1)),
+        "52W Pos (%)": parseFloat(pct.toFixed(1))
+      }
+    })
+  }
+
+  const colors = ['#26a366', '#3b82f6', '#ec4899', '#f59e0b', '#8b5cf6']
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl bg-black/95 border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-scale-up">
+      <div className="w-full max-w-5xl bg-black/95 border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-scale-up">
         {/* Header */}
         <div className="p-5 border-b border-white/5 flex justify-between items-center">
           <div>
@@ -522,13 +724,15 @@ function StockCompareModal({ stocks, onClose }: { stocks: StockData[]; onClose: 
             </h2>
             <p className="text-xs text-gray-500 mt-0.5">Compare key efficiency, valuation, and return metrics side-by-side.</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/5">
+          <button onClick={onClose} className="text-gray-400 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-colors">
             <X size={18} />
           </button>
         </div>
 
         {/* Content area */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6 no-scrollbar">
+          
+          {/* Table comparison */}
           <div className="overflow-x-auto no-scrollbar rounded-xl border border-white/5 bg-white/[0.01]">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
@@ -540,6 +744,7 @@ function StockCompareModal({ stocks, onClose }: { stocks: StockData[]; onClose: 
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
+                {/* Current Price */}
                 <tr>
                   <td className="p-3 font-semibold text-gray-400">Current Price</td>
                   {stocks.map(s => (
@@ -548,46 +753,117 @@ function StockCompareModal({ stocks, onClose }: { stocks: StockData[]; onClose: 
                     </td>
                   ))}
                 </tr>
+                {/* P/E Ratio */}
                 <tr>
-                  <td className="p-3 font-semibold text-gray-400">P/E Ratio</td>
+                  <td className="p-3 font-semibold text-gray-400 flex items-center gap-1">P/E Ratio <span className="text-[8px] text-gray-600">(lower is better)</span></td>
+                  {stocks.map(s => {
+                    const isWin = winners.pe.includes(s.ticker)
+                    return (
+                      <td key={s.ticker} className={`p-3 text-right font-mono font-bold ${isWin ? 'text-emerald-400 bg-emerald-500/5' : 'text-gray-200'}`}>
+                        {s.stock_pe ?? '—'} {isWin && '🏆'}
+                      </td>
+                    )
+                  })}
+                </tr>
+                {/* P/B Ratio */}
+                <tr>
+                  <td className="p-3 font-semibold text-gray-400 flex items-center gap-1">P/B Ratio <span className="text-[8px] text-gray-600">(lower is better)</span></td>
+                  {stocks.map(s => {
+                    const pb = s.current_price && s.book_value ? s.current_price / s.book_value : null
+                    const isWin = pb !== null && winners.pb.includes(s.ticker)
+                    return (
+                      <td key={s.ticker} className={`p-3 text-right font-mono font-bold ${isWin ? 'text-emerald-400 bg-emerald-500/5' : 'text-gray-200'}`}>
+                        {pb ? `${pb.toFixed(2)}x` : '—'} {isWin && '🏆'}
+                      </td>
+                    )
+                  })}
+                </tr>
+                {/* ROCE */}
+                <tr>
+                  <td className="p-3 font-semibold text-gray-400">ROCE (%)</td>
+                  {stocks.map(s => {
+                    const isWin = winners.roce.includes(s.ticker)
+                    return (
+                      <td key={s.ticker} className={`p-3 text-right font-mono font-bold ${isWin ? 'text-emerald-400 bg-emerald-500/5' : 'text-gray-200'}`}>
+                        {s.roce ? `${s.roce}%` : '—'} {isWin && '🏆'}
+                      </td>
+                    )
+                  })}
+                </tr>
+                {/* ROE */}
+                <tr>
+                  <td className="p-3 font-semibold text-gray-400">ROE (%)</td>
+                  {stocks.map(s => {
+                    const isWin = winners.roe.includes(s.ticker)
+                    return (
+                      <td key={s.ticker} className={`p-3 text-right font-mono font-bold ${isWin ? 'text-emerald-400 bg-emerald-500/5' : 'text-gray-200'}`}>
+                        {s.roe ? `${s.roe}%` : '—'} {isWin && '🏆'}
+                      </td>
+                    )
+                  })}
+                </tr>
+                {/* EPS */}
+                <tr>
+                  <td className="p-3 font-semibold text-gray-400">Earnings Per Share (EPS)</td>
                   {stocks.map(s => (
-                    <td key={s.ticker} className="p-3 text-right font-mono text-white">
-                      {s.stock_pe ?? '—'}
+                    <td key={s.ticker} className="p-3 text-right font-mono text-gray-200">
+                      {s.eps ? `₹${s.eps.toFixed(1)}` : '—'}
                     </td>
                   ))}
                 </tr>
+                {/* Dividend Yield */}
                 <tr>
-                  <td className="p-3 font-semibold text-gray-400">ROCE</td>
-                  {stocks.map(s => (
-                    <td key={s.ticker} className="p-3 text-right font-mono text-brand-400 font-bold">
-                      {s.roce ? `${s.roce}%` : '—'}
-                    </td>
-                  ))}
+                  <td className="p-3 font-semibold text-gray-400">Dividend Yield (%)</td>
+                  {stocks.map(s => {
+                    const isWin = winners.dividend.includes(s.ticker)
+                    return (
+                      <td key={s.ticker} className={`p-3 text-right font-mono font-bold ${isWin ? 'text-emerald-400 bg-emerald-500/5' : 'text-gray-200'}`}>
+                        {s.dividend_yield ? `${s.dividend_yield}%` : '—'} {isWin && '🏆'}
+                      </td>
+                    )
+                  })}
                 </tr>
+                {/* Spread */}
                 <tr>
-                  <td className="p-3 font-semibold text-gray-400">ROE</td>
-                  {stocks.map(s => (
-                    <td key={s.ticker} className="p-3 text-right font-mono text-brand-400 font-bold">
-                      {s.roe ? `${s.roe}%` : '—'}
-                    </td>
-                  ))}
+                  <td className="p-3 font-semibold text-gray-400">Day High-Low Spread</td>
+                  {stocks.map(s => {
+                    const spread = s.high && s.low ? ((s.high - s.low) / s.low) * 100 : null
+                    return (
+                      <td key={s.ticker} className="p-3 text-right font-mono text-gray-400">
+                        {spread ? `${spread.toFixed(2)}%` : '—'}
+                      </td>
+                    )
+                  })}
                 </tr>
+                {/* 52W range percentile */}
                 <tr>
-                  <td className="p-3 font-semibold text-gray-400">Dividend Yield</td>
-                  {stocks.map(s => (
-                    <td key={s.ticker} className="p-3 text-right font-mono text-white">
-                      {s.dividend_yield ? `${s.dividend_yield}%` : '—'}
-                    </td>
-                  ))}
+                  <td className="p-3 font-semibold text-gray-400">52W Range Percentile</td>
+                  {stocks.map(s => {
+                    let pct = null
+                    if (s.week_52_high && s.week_52_low && s.current_price) {
+                      const range = s.week_52_high - s.week_52_low
+                      if (range > 0) pct = ((s.current_price - s.week_52_low) / range) * 100
+                    }
+                    return (
+                      <td key={s.ticker} className="p-3 text-right font-mono text-gray-300">
+                        {pct !== null ? `${pct.toFixed(0)}%` : '—'}
+                      </td>
+                    )
+                  })}
                 </tr>
+                {/* Market Cap */}
                 <tr>
                   <td className="p-3 font-semibold text-gray-400">Market Cap</td>
-                  {stocks.map(s => (
-                    <td key={s.ticker} className="p-3 text-right font-mono text-white">
-                      {s.market_cap ? `₹${s.market_cap.toLocaleString('en-IN')} Cr` : '—'}
-                    </td>
-                  ))}
+                  {stocks.map(s => {
+                    const isWin = winners.mcap.includes(s.ticker)
+                    return (
+                      <td key={s.ticker} className={`p-3 text-right font-mono font-bold ${isWin ? 'text-emerald-400 bg-emerald-500/5' : 'text-gray-200'}`}>
+                        {s.market_cap ? `₹${s.market_cap.toLocaleString('en-IN')} Cr` : '—'} {isWin && '🏆'}
+                      </td>
+                    )
+                  })}
                 </tr>
+                {/* 14-Day RSI */}
                 <tr>
                   <td className="p-3 font-semibold text-gray-400">14-Day RSI</td>
                   {stocks.map(s => (
@@ -604,6 +880,7 @@ function StockCompareModal({ stocks, onClose }: { stocks: StockData[]; onClose: 
                     </td>
                   ))}
                 </tr>
+                {/* SMA-50 Crossover */}
                 <tr>
                   <td className="p-3 font-semibold text-gray-400">SMA-50 Crossover</td>
                   {stocks.map(s => (
@@ -620,10 +897,11 @@ function StockCompareModal({ stocks, onClose }: { stocks: StockData[]; onClose: 
                     </td>
                   ))}
                 </tr>
+                {/* Sector */}
                 <tr>
                   <td className="p-3 font-semibold text-gray-400">Sector</td>
                   {stocks.map(s => (
-                    <td key={s.ticker} className="p-3 text-right text-gray-400">
+                    <td key={s.ticker} className="p-3 text-right text-gray-400 font-sans truncate max-w-[120px]" title={s.sector || ''}>
                       {s.sector || '—'}
                     </td>
                   ))}
@@ -632,27 +910,156 @@ function StockCompareModal({ stocks, onClose }: { stocks: StockData[]; onClose: 
             </table>
           </div>
 
-          <div className="space-y-2">
-            <h4 className="text-xs font-semibold text-white uppercase tracking-wider">Return efficiency comparison (ROCE vs. ROE)</h4>
-            <div className="h-60 bg-white/[0.01] border border-white/5 rounded-xl p-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#182030" />
-                  <XAxis dataKey="name" tick={{ fill: '#4b5563', fontSize: 10 }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fill: '#4b5563', fontSize: 10 }} tickLine={false} axisLine={false} tickFormatter={v => `${v}%`} />
-                  <Tooltip 
-                    contentStyle={{ background: '#0e1420', border: '1px solid #182030', borderRadius: 8, fontSize: 11 }}
-                    labelStyle={{ color: '#9ca3af' }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 10 }} />
-                  <Bar dataKey="ROCE" fill="#26a366" radius={[4, 4, 0, 0]} name="ROCE (%)" />
-                  <Bar dataKey="ROE" fill="#3b82f6" radius={[4, 4, 0, 0]} name="ROE (%)" />
-                </BarChart>
-              </ResponsiveContainer>
+          {/* Interactive Charting Panel & Leaderboard */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Chart comparison block */}
+            <div className="lg:col-span-2 card border-white/5 bg-white/[0.01] p-5 rounded-2xl space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                {/* Metric switching buttons */}
+                <div className="flex items-center gap-1 p-1 bg-surface-muted rounded-xl w-fit">
+                  {(['efficiency', 'valuation', 'technical'] as const).map(g => (
+                    <button
+                      key={g}
+                      onClick={() => setMetricGroup(g)}
+                      className={`px-3 py-1.5 rounded-lg text-[10px] uppercase font-bold tracking-wider transition-all ${
+                        metricGroup === g ? 'bg-surface-card text-white shadow-sm' : 'text-gray-500 hover:text-white'
+                      }`}
+                    >
+                      {g === 'efficiency' ? 'Returns / ROCE' : g === 'valuation' ? 'Valuation / P/E' : 'Technicals'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Chart type toggle */}
+                <div className="flex items-center gap-1 p-1 bg-surface-muted rounded-xl w-fit">
+                  {(['radar', 'bar'] as const).map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setChartType(t)}
+                      className={`px-3 py-1.5 rounded-lg text-[10px] uppercase font-bold tracking-wider transition-all ${
+                        chartType === t ? 'bg-surface-card text-white shadow-sm' : 'text-gray-500 hover:text-white'
+                      }`}
+                    >
+                      {t === 'radar' ? 'Radar Core' : 'Bar Chart'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Chart container */}
+              <div className="h-64 relative flex items-center justify-center">
+                <ResponsiveContainer width="100%" height="100%">
+                  {chartType === 'radar' ? (
+                    <RadarChart cx="50%" cy="50%" outerRadius="75%" data={radarData}>
+                      <PolarGrid stroke="#182030" />
+                      <PolarAngleAxis dataKey="subject" tick={{ fill: '#9ca3af', fontSize: 9 }} />
+                      <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: '#4b5563', fontSize: 8 }} />
+                      {stocks.map((s, idx) => (
+                        <Radar
+                          key={s.ticker}
+                          name={s.ticker}
+                          dataKey={s.ticker}
+                          stroke={colors[idx % colors.length]}
+                          fill={colors[idx % colors.length]}
+                          fillOpacity={0.15}
+                        />
+                      ))}
+                      <Tooltip 
+                        contentStyle={{ background: '#0e1420', border: '1px solid #182030', borderRadius: 12, fontSize: 11 }}
+                        labelStyle={{ color: '#9ca3af' }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 9, paddingTop: 10 }} />
+                    </RadarChart>
+                  ) : (
+                    <BarChart data={barChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#182030" />
+                      <XAxis dataKey="name" tick={{ fill: '#9ca3af', fontSize: 9 }} tickLine={false} axisLine={false} />
+                      <YAxis tick={{ fill: '#9ca3af', fontSize: 9 }} tickLine={false} axisLine={false} />
+                      <Tooltip 
+                        contentStyle={{ background: '#0e1420', border: '1px solid #182030', borderRadius: 12, fontSize: 11 }}
+                        labelStyle={{ color: '#9ca3af' }}
+                      />
+                      <Legend wrapperStyle={{ fontSize: 9 }} />
+                      {Object.keys(barChartData[0] || {}).filter(k => k !== 'name').map((key, idx) => (
+                        <Bar
+                          key={key}
+                          dataKey={key}
+                          fill={colors[idx % colors.length]}
+                          radius={[4, 4, 0, 0]}
+                        />
+                      ))}
+                    </BarChart>
+                  )}
+                </ResponsiveContainer>
+              </div>
             </div>
+
+            {/* Leaderboard Verdict panel */}
+            <div className="card border-brand-500/10 bg-brand-950/5 p-5 rounded-2xl relative overflow-hidden flex flex-col justify-between">
+              {/* Background glow overlay */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full bg-brand-500/5 blur-[60px] pointer-events-none" />
+              
+              <div className="relative z-10 space-y-4">
+                <h4 className="text-xs font-mono font-bold text-brand-300 uppercase tracking-widest flex items-center gap-1.5 border-b border-white/5 pb-2">
+                  <Sparkles size={13} className="animate-pulse text-brand-400" /> Quant Leaderboard Verdict
+                </h4>
+                
+                <div className="space-y-3.5">
+                  {scoredStocks.map((item, idx) => {
+                    const pillColors = ['bg-emerald-500/10 text-emerald-400 border-emerald-500/20', 'bg-blue-500/10 text-blue-400 border-blue-500/20', 'bg-amber-500/10 text-amber-400 border-amber-500/20', 'bg-red-500/10 text-red-400 border-red-500/20']
+                    const progressColors = ['bg-emerald-500', 'bg-blue-500', 'bg-amber-500', 'bg-red-500']
+                    const labels = [
+                      'Strong Buy / Premium Financials',
+                      'Accumulate / Robust Growth',
+                      'Hold / Average Valuation',
+                      'Avoid / Expensive or Weak'
+                    ]
+                    
+                    let ratingIdx = 2
+                    if (item.score >= 7.5) ratingIdx = 0
+                    else if (item.score >= 5.5) ratingIdx = 1
+                    else if (item.score < 3.5) ratingIdx = 3
+                    
+                    return (
+                      <div key={item.ticker} className="space-y-1.5">
+                        <div className="flex justify-between items-baseline text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold font-mono text-[9px] text-gray-500">#{idx + 1}</span>
+                            <span className="font-bold text-white">{item.ticker}</span>
+                            {idx === 0 && <span className="text-[8px] px-1.5 py-0.2 bg-brand-500/20 text-brand-300 border border-brand-500/30 rounded font-mono font-bold">WINNER</span>}
+                          </div>
+                          <div className="flex items-center gap-2 font-mono text-[10px] text-white font-bold">
+                            {item.score.toFixed(1)}/10
+                          </div>
+                        </div>
+                        
+                        <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all duration-500 ${progressColors[ratingIdx]}`}
+                            style={{ width: `${item.score * 10}%` }}
+                          />
+                        </div>
+
+                        <div className={`px-2 py-0.5 text-[9px] border rounded w-fit ${pillColors[ratingIdx]}`}>
+                          {labels[ratingIdx]}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="relative z-10 text-[9px] text-gray-500 font-mono leading-relaxed mt-4 bg-black/40 p-2.5 rounded-xl border border-white/[0.04]">
+                💡 <strong>Quant scoring algorithm</strong> weights metrics based on relative valuation (P/E, P/B), capital efficiency (ROCE, ROE), dividend yield, and technical oscillators (RSI, SMA).
+              </div>
+            </div>
+
           </div>
+
         </div>
 
+        {/* Footer */}
         <div className="p-4 border-t border-white/5 bg-white/[0.01] flex justify-end">
           <button onClick={onClose} className="btn-primary text-xs px-5 py-2">
             Close comparison
