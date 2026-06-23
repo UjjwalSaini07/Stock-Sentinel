@@ -57,6 +57,9 @@ class StockData(BaseModel):
 class AlertCreate(BaseModel):
     ticker: str
     exchange: str = "NSE"
+    alert_type: str = "price"  # "price" | "volume" | "news" | "sentiment"
+    condition: Optional[str] = None  # "above" | "below" | "contains" | "equals"
+    value: Optional[str] = None  # target value or keyword
     buy_price: Optional[float] = None
     target_price: Optional[float] = None
     stop_loss: Optional[float] = None
