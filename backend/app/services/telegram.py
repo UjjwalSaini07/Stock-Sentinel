@@ -5,16 +5,18 @@ from bson import ObjectId
 
 TELEGRAM_API = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}"
 
-async def send_telegram_message(chat_id: str, message: str):
+async def send_telegram_message(chat_id: str, message: str, bot_token: str = None):
     """Send a message to a Telegram chat."""
-    if not settings.TELEGRAM_BOT_TOKEN:
+    token = bot_token or settings.TELEGRAM_BOT_TOKEN
+    if not token:
         print(f"[Telegram] No token set. Would send: {message}")
         return
     
+    api_url = f"https://api.telegram.org/bot{token}/sendMessage"
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.post(
-                f"{TELEGRAM_API}/sendMessage",
+                api_url,
                 json={"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
             )
             resp.raise_for_status()
@@ -40,12 +42,12 @@ async def notify_alert_triggered(user_id: str, ticker: str, price: float, alert_
         f"_Check your portfolio now!_"
     )
     
-    await send_telegram_message(user["telegram_chat_id"], message)
+    await send_telegram_message(user["telegram_chat_id"], message, user.get("telegram_bot_token"))
 
-async def send_portfolio_summary(chat_id: str, portfolio_data: list):
+async def send_portfolio_summary(chat_id: str, portfolio_data: list, bot_token: str = None):
     """Send weekly portfolio summary."""
     if not portfolio_data:
-        await send_telegram_message(chat_id, "📊 Your portfolio is empty. Add some stocks on StockSentinel!")
+        await send_telegram_message(chat_id, "📊 Your portfolio is empty. Add some stocks on StockSentinel!", bot_token)
         return
     
     lines = ["📊 *Your Portfolio Summary*\n"]
@@ -62,4 +64,4 @@ async def send_portfolio_summary(chat_id: str, portfolio_data: list):
     total_emoji = "🟢" if total_pnl >= 0 else "🔴"
     lines.append(f"\n{total_emoji} *Total P&L*: ₹{total_pnl:+,.2f}")
     
-    await send_telegram_message(chat_id, "\n".join(lines))
+    await send_telegram_message(chat_id, "\n".join(lines), bot_token)

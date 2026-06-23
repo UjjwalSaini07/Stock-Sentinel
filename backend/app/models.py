@@ -36,6 +36,7 @@ class PortfolioEntryOut(PortfolioEntry):
 
 class TelegramLinkRequest(BaseModel):
     chat_id: str
+    bot_token: str
 
 # ── Stock ─────────────────────────────────────────────────
 class StockData(BaseModel):

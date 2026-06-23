@@ -15,6 +15,10 @@ async def get_me(user=Depends(get_current_user)):
         "email": user["email"],
         "name": user["name"],
         "telegram_linked": bool(user.get("telegram_chat_id")),
+        "telegram_chat_id": user.get("telegram_chat_id"),
+        "telegram_bot_token": user.get("telegram_bot_token"),
+        "telegram_bot_username": user.get("telegram_bot_username"),
+        "telegram_bot_name": user.get("telegram_bot_name"),
         "portfolio": portfolio_enriched
     }
 
@@ -49,11 +53,67 @@ async def remove_from_portfolio(ticker: str, user=Depends(get_current_user)):
 @router.post("/telegram")
 async def link_telegram(body: TelegramLinkRequest, user=Depends(get_current_user)):
     db = get_db()
+    import httpx
+    
+    # Validate token and get bot username/first_name from Telegram getMe endpoint
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(f"https://api.telegram.org/bot{body.bot_token}/getMe")
+            if resp.status_code != 200:
+                raise HTTPException(status_code=400, detail="Invalid Telegram Bot Token (Connection failed)")
+            bot_data = resp.json().get("result", {})
+            bot_username = bot_data.get("username")
+            bot_name = bot_data.get("first_name")
+        except Exception as e:
+            if isinstance(e, HTTPException):
+                raise e
+            raise HTTPException(status_code=400, detail=f"Failed to connect to Telegram API: {str(e)}")
+            
     await db.users.update_one(
         {"_id": user["_id"]},
-        {"$set": {"telegram_chat_id": body.chat_id}}
+        {"$set": {
+            "telegram_chat_id": body.chat_id,
+            "telegram_bot_token": body.bot_token,
+            "telegram_bot_username": bot_username,
+            "telegram_bot_name": bot_name
+        }}
     )
-    return {"message": "Telegram linked successfully"}
+    return {
+        "message": "Telegram linked successfully",
+        "bot_username": bot_username,
+        "bot_name": bot_name
+    }
+
+@router.post("/telegram/test")
+async def test_telegram_connection(user=Depends(get_current_user)):
+    chat_id = user.get("telegram_chat_id")
+    bot_token = user.get("telegram_bot_token")
+    
+    if not chat_id or not bot_token:
+        raise HTTPException(status_code=400, detail="Telegram bot credentials are not configured")
+        
+    message = (
+        "🎯 *StockSentinel Alert Connection Verified*\n\n"
+        "Your custom bot is now successfully connected to your StockSentinel account! "
+        "You will receive live stock alerts, target levels, and portfolio summaries directly here."
+    )
+    
+    import httpx
+    telegram_api = f"https://api.telegram.org/bot{bot_token}"
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.post(
+                f"{telegram_api}/sendMessage",
+                json={"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
+            )
+            if resp.status_code != 200:
+                raise HTTPException(status_code=400, detail=f"Telegram API error: {resp.text}")
+        except Exception as e:
+            if isinstance(e, HTTPException):
+                raise e
+            raise HTTPException(status_code=400, detail=f"Failed to send welcome message: {str(e)}")
+            
+    return {"message": "Welcome message sent successfully"}
 
 
 @router.get("/portfolio/performance")

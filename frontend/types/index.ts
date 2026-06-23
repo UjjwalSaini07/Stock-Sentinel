@@ -3,6 +3,10 @@ export interface User {
   email: string
   name: string
   telegram_linked: boolean
+  telegram_chat_id?: string
+  telegram_bot_token?: string
+  telegram_bot_username?: string
+  telegram_bot_name?: string
   portfolio: PortfolioEntry[]
   watchlist?: string[]
 }
