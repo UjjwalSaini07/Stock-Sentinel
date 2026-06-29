@@ -168,11 +168,20 @@ def run_scraper():
                             {"$set": stock_data},
                             upsert=True,
                         )
-                        db["price_history"].insert_one({
-                            "ticker": stock_data["ticker"],
-                            "price": stock_data["current_price"],
-                            "timestamp": datetime.now(timezone.utc)
-                        })
+                        # Save to price history only if price changed
+                        last_record = db["price_history"].find_one(
+                            {"ticker": stock_data["ticker"]},
+                            sort=[("timestamp", -1)]
+                        )
+                        if not last_record or last_record.get("price") != stock_data["current_price"]:
+                            db["price_history"].insert_one({
+                                "ticker": stock_data["ticker"],
+                                "price": stock_data["current_price"],
+                                "timestamp": datetime.now(timezone.utc)
+                            })
+                            print(f"Saved {stock_data['ticker']} price tick to history")
+                        else:
+                            print(f"Price for {stock_data['ticker']} did not change ({stock_data['current_price']}); skipping history insert")
                     else:
                         print(f"Error fetching data for {ticker}: {stock_data['error']}")
                 except Exception as e:

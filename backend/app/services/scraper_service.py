@@ -254,13 +254,20 @@ async def scrape_stock(ticker: str, exchange: str = "NSE") -> Optional[dict]:
             )
             logger.info(f"Saved {ticker} to MongoDB")
             
-            # Save to price history
-            await db.price_history.insert_one({
-                "ticker": ticker,
-                "price": final_price,
-                "timestamp": datetime.now(timezone.utc)
-            })
-            logger.info(f"Saved {ticker} price tick to history")
+            # Save to price history only if price changed
+            last_record = await db.price_history.find_one(
+                {"ticker": ticker},
+                sort=[("timestamp", -1)]
+            )
+            if not last_record or last_record.get("price") != final_price:
+                await db.price_history.insert_one({
+                    "ticker": ticker,
+                    "price": final_price,
+                    "timestamp": datetime.now(timezone.utc)
+                })
+                logger.info(f"Saved {ticker} price tick to history")
+            else:
+                logger.info(f"Price for {ticker} did not change ({final_price}); skipping history insert")
         except Exception as e:
             logger.error(f"MongoDB write error for {ticker}: {e}")
     
