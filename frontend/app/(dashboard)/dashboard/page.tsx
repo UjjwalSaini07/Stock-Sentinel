@@ -1189,7 +1189,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5 animate-fade-in pb-12">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gradient-to-r from-white/[0.02] to-transparent p-5 rounded-2xl border border-white/[0.04] backdrop-blur-md shadow-2xl relative overflow-hidden group">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5 bg-gradient-to-br from-white/[0.03] to-white/[0.005] p-6 rounded-2xl border border-white/[0.05] backdrop-blur-xl shadow-2xl relative overflow-hidden group">
         {/* Ambient Time Glow Backdrop */}
         <div className={`absolute -left-10 -top-10 w-44 h-44 rounded-full blur-[80px] pointer-events-none opacity-45 mix-blend-screen transition-colors duration-1000 ${
           new Date().getHours() < 12 
@@ -1202,7 +1202,7 @@ export default function DashboardPage() {
         
         <div className="flex items-center gap-4 relative z-10 flex-wrap md:flex-nowrap">
           {/* Dynamic Greeting Icon Box */}
-          <div className="w-12 h-12 rounded-2xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-center shadow-inner relative group-hover:border-white/10 transition-colors duration-300">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-white/[0.04] to-transparent border border-white/[0.06] flex items-center justify-center shadow-inner relative group-hover:border-white/10 transition-colors duration-300 shrink-0">
             {new Date().getHours() < 12 ? (
               <Sun className="w-5.5 h-5.5 text-amber-400 animate-pulse" />
             ) : new Date().getHours() < 17 ? (
@@ -1250,15 +1250,18 @@ export default function DashboardPage() {
             {/* Active Alerts Pill */}
             <div 
               onClick={() => scrollToSection('dashboard-alerts')}
-              className="flex items-center gap-3.5 px-3 py-1.5 rounded-xl border border-white/[0.03] bg-white/[0.01] hover:bg-amber-500/[0.02] hover:border-amber-500/20 hover:shadow-[0_0_12px_rgba(251,191,36,0.04)] transition-all duration-300 cursor-pointer hover:scale-[1.02] active:scale-[0.98] group/stat"
+              className="flex items-center gap-4 px-4 py-2.5 rounded-2xl border border-white/[0.05] bg-gradient-to-br from-white/[0.02] to-transparent hover:from-white/[0.04] hover:to-white/[0.01] hover:border-amber-500/30 hover:shadow-[0_0_20px_rgba(251,191,36,0.06)] transition-all duration-300 cursor-pointer hover:scale-[1.02] active:scale-[0.98] group/stat relative overflow-hidden shrink-0 shadow-lg"
               title="Click to view active alerts"
             >
-              <div className="w-8 h-8 rounded-lg bg-amber-500/5 flex items-center justify-center text-amber-500 shadow-inner group-hover/stat:bg-amber-500/10 transition-colors duration-300">
-                <Bell size={13} className={alerts.filter(a => a.is_active).length > 0 ? 'animate-bounce' : ''} />
+              {/* Left Accent Neon Bar */}
+              <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 opacity-60 group-hover/stat:opacity-100 transition-opacity" />
+              
+              <div className="w-10 h-10 rounded-xl bg-amber-500/5 border border-amber-500/10 flex items-center justify-center text-amber-500 shadow-inner group-hover/stat:bg-amber-500/10 group-hover/stat:border-amber-500/20 transition-all duration-300">
+                <Bell size={15} className={alerts.filter(a => a.is_active).length > 0 ? 'animate-bounce' : ''} />
               </div>
-              <div className="flex flex-col">
-                <span className="text-[9px] uppercase font-extrabold text-gray-500 tracking-wider leading-none">Active Alerts</span>
-                <span className="text-sm font-bold text-white font-mono mt-1.5 leading-none">
+              <div className="flex flex-col pr-1">
+                <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider leading-none">Active Alerts</span>
+                <span className="text-lg font-black text-white font-mono mt-1.5 leading-none">
                   {alerts.filter(a => a.is_active).length}
                 </span>
               </div>
@@ -1267,15 +1270,18 @@ export default function DashboardPage() {
             {/* Positions Pill */}
             <div 
               onClick={() => scrollToSection('dashboard-holdings')}
-              className="flex items-center gap-3.5 px-3 py-1.5 rounded-xl border border-white/[0.03] bg-white/[0.01] hover:bg-brand-500/[0.02] hover:border-brand-500/20 hover:shadow-[0_0_12px_rgba(38,163,102,0.04)] transition-all duration-300 cursor-pointer hover:scale-[1.02] active:scale-[0.98] group/stat"
+              className="flex items-center gap-4 px-4 py-2.5 rounded-2xl border border-white/[0.05] bg-gradient-to-br from-white/[0.02] to-transparent hover:from-white/[0.04] hover:to-white/[0.01] hover:border-brand-500/30 hover:shadow-[0_0_20px_rgba(38,163,102,0.06)] transition-all duration-300 cursor-pointer hover:scale-[1.02] active:scale-[0.98] group/stat relative overflow-hidden shrink-0 shadow-lg"
               title="Click to view holdings"
             >
-              <div className="w-8 h-8 rounded-lg bg-brand-500/5 flex items-center justify-center text-brand-400 shadow-inner group-hover/stat:bg-brand-500/10 transition-colors duration-300">
-                <Briefcase size={13} />
+              {/* Left Accent Neon Bar */}
+              <div className="absolute left-0 top-0 bottom-0 w-1 bg-brand-500 opacity-60 group-hover/stat:opacity-100 transition-opacity" />
+              
+              <div className="w-10 h-10 rounded-xl bg-brand-500/5 border border-brand-500/10 flex items-center justify-center text-brand-400 shadow-inner group-hover/stat:bg-brand-500/10 group-hover/stat:border-brand-500/20 transition-all duration-300">
+                <Briefcase size={15} />
               </div>
-              <div className="flex flex-col">
-                <span className="text-[9px] uppercase font-extrabold text-gray-500 tracking-wider leading-none">Positions</span>
-                <span className="text-sm font-bold text-white font-mono mt-1.5 leading-none">
+              <div className="flex flex-col pr-1">
+                <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider leading-none">Positions</span>
+                <span className="text-lg font-black text-white font-mono mt-1.5 leading-none">
                   {portfolio.length}
                 </span>
               </div>
@@ -1283,13 +1289,13 @@ export default function DashboardPage() {
           </div>
         </div>
         
-        <div className="flex items-center gap-2 relative z-10">
-          <button onClick={handleRefresh} disabled={refreshing} className="btn-outline flex items-center gap-2 text-xs bg-white/[0.01] hover:bg-white/[0.04] border-white/5 hover:border-white/10 py-2.5 px-4 transition-all duration-300 rounded-xl group/btn">
+        <div className="flex items-center gap-3 relative z-10">
+          <button onClick={handleRefresh} disabled={refreshing} className="btn-outline flex items-center gap-2 text-xs bg-white/[0.02] hover:bg-white/[0.05] border-white/[0.06] hover:border-white/15 py-2.5 px-4.5 transition-all duration-300 rounded-xl group/btn font-bold text-gray-200 hover:text-white shadow-md">
             <RefreshCw size={13} className={`${refreshing ? 'animate-spin' : 'group-hover/btn:rotate-180'} text-brand-400 transition-transform duration-500`} />
             Refresh
           </button>
-          <button onClick={() => setShowAddModal(true)} className="btn-primary flex items-center gap-2 text-xs py-2.5 px-4 rounded-xl shadow-[0_0_20px_rgba(38,163,102,0.12)] hover:shadow-[0_0_25px_rgba(38,163,102,0.22)] transition-all duration-300 border border-brand-400/20 hover:scale-[1.02]">
-            <Plus size={14} /> Add Stock
+          <button onClick={() => setShowAddModal(true)} className="btn-primary flex items-center gap-2 text-xs py-2.5 px-4.5 rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400 text-white font-extrabold shadow-[0_4px_20px_rgba(38,163,102,0.2)] hover:shadow-[0_4px_25px_rgba(38,163,102,0.35)] transition-all duration-300 border border-brand-400/20 hover:scale-[1.02] active:scale-[0.98]">
+            <Plus size={14} className="stroke-[3]" /> Add Stock
           </button>
         </div>
       </div>
