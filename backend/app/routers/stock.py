@@ -100,54 +100,105 @@ async def get_stock_history(ticker: str):
 async def get_market_indices():
     import httpx
     import logging
+    import asyncio
+    from datetime import datetime, timezone, timedelta
     logger = logging.getLogger("stocksentinel.api")
     
     indices = {
         "^NSEI": "NIFTY 50",
-        "^BSESN": "SENSEX"
+        "^BSESN": "SENSEX",
+        "^NSEBANK": "NIFTY BANK",
+        "^CNXIT": "NIFTY IT",
+        "^GSPC": "S&P 500",
+        "^IXIC": "NASDAQ",
+        "^DJI": "DOW JONES",
+        "^N225": "NIKKEI 225",
+        "^HSI": "HANG SENG",
+        "^FTSE": "FTSE 100",
+        "^GDAXI": "DAX INDEX",
+        "^VIX": "VIX INDEX",
+        "BTC-USD": "BITCOIN",
+        "GC=F": "GOLD",
+        "CL=F": "CRUDE OIL"
     }
     
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
     
+    # Calculate Indian Stock Market Status (Mon-Fri, 9:15 AM to 3:30 PM IST)
+    ist = timezone(timedelta(hours=5, minutes=30))
+    now_ist = datetime.now(ist)
+    weekday = now_ist.weekday()
+    
+    if weekday >= 5:
+        is_open = False
+        message = "Market Closed (Weekend)"
+    else:
+        minutes = now_ist.hour * 60 + now_ist.minute
+        start_minutes = 9 * 60 + 15
+        end_minutes = 15 * 60 + 30
+        
+        if start_minutes <= minutes <= end_minutes:
+            is_open = True
+            message = "Market Live"
+        elif minutes < start_minutes:
+            is_open = False
+            message = "Market Opens at 9:15 AM IST"
+        else:
+            is_open = False
+            message = "Market Closed"
+            
+    async def fetch_index(client, symbol, name):
+        try:
+            # Fetch 15m intervals to construct intraday sparklines
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=1d&interval=15m"
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                data = resp.json()
+                res_list = data.get("chart", {}).get("result", [])
+                if res_list:
+                    meta = res_list[0].get("meta", {})
+                    price = meta.get("regularMarketPrice")
+                    prev_close = meta.get("chartPreviousClose")
+                    
+                    indicators = res_list[0].get("indicators", {})
+                    quote = indicators.get("quote", [{}])[0]
+                    close_prices = quote.get("close", [])
+                    sparkline = [round(p, 2) for p in close_prices if p is not None]
+                    
+                    if price is not None and prev_close is not None:
+                        change = price - prev_close
+                        change_percent = (change / prev_close) * 100
+                        return {
+                            "symbol": symbol.replace("^", "").replace("=", ""),
+                            "name": name,
+                            "price": round(price, 2),
+                            "prev_close": round(prev_close, 2),
+                            "change": round(change, 2),
+                            "change_percent": round(change_percent, 2),
+                            "sparkline": sparkline
+                        }
+            logger.warning(f"Failed to fetch market index {symbol} (Status {resp.status_code})")
+        except Exception as e:
+            logger.error(f"Error fetching market index {symbol}: {e}")
+        return None
+
     result = []
     async with httpx.AsyncClient(headers=headers, timeout=5.0) as client:
-        for symbol, name in indices.items():
-            try:
-                url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?range=1d&interval=1d"
-                resp = await client.get(url)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    res_list = data.get("chart", {}).get("result", [])
-                    if res_list:
-                        meta = res_list[0].get("meta", {})
-                        price = meta.get("regularMarketPrice")
-                        prev_close = meta.get("chartPreviousClose")
-                        
-                        if price is not None and prev_close is not None:
-                            change = price - prev_close
-                            change_percent = (change / prev_close) * 100
-                            result.append({
-                                "symbol": symbol.replace("^", ""),
-                                "name": name,
-                                "price": round(price, 2),
-                                "prev_close": round(prev_close, 2),
-                                "change": round(change, 2),
-                                "change_percent": round(change_percent, 2)
-                            })
-                            continue
-                logger.warning(f"Failed to fetch market index {symbol} (Status {resp.status_code})")
-            except Exception as e:
-                logger.error(f"Error fetching index {symbol}: {e}")
+        tasks = [fetch_index(client, symbol, name) for symbol, name in indices.items()]
+        completed = await asyncio.gather(*tasks)
+        result = [c for c in completed if c is not None]
                 
-    # Fallback default values if API fails
-    if not result:
-        result = [
-            {"symbol": "NSEI", "name": "NIFTY 50", "price": 24085.70, "prev_close": 23989.15, "change": 96.55, "change_percent": 0.40},
-            {"symbol": "BSESN", "name": "SENSEX", "price": 77155.62, "prev_close": 76950.00, "change": 205.62, "change_percent": 0.27}
-        ]
-    return result
+
+        
+    return {
+        "market_status": {
+            "is_open": is_open,
+            "message": message
+        },
+        "indices": result
+    }
 
 
 @router.get("/market/news")

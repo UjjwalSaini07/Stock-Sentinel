@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Wallet, TrendingUp, TrendingDown, BarChart2, RefreshCw, ArrowUpRight, Activity, Info, ShieldAlert, Trash2, Sun, Moon } from 'lucide-react'
+import { Plus, Wallet, TrendingUp, TrendingDown, BarChart2, RefreshCw, ArrowUpRight, Activity, Info, ShieldAlert, Trash2, Sun, Moon, Bell, Briefcase } from 'lucide-react'
 import Link from 'next/link'
 import { useAuthStore } from '@/lib/store'
 import StatCard from '@/components/ui/StatCard'
@@ -1059,11 +1059,21 @@ export default function DashboardPage() {
   const [sortBy, setSortBy] = useState<'value' | 'pnl' | 'ticker'>('value')
 
   const [indices, setIndices] = useState<MarketIndex[]>([])
+  const [marketStatus, setMarketStatus] = useState<{ is_open: boolean; message: string } | null>(null)
   const [news, setNews] = useState<NewsArticle[]>([])
   const [performance, setPerformance] = useState<PortfolioPerformance | null>(null)
   const [loadingAnalytics, setLoadingAnalytics] = useState(true)
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [loadingAlerts, setLoadingAlerts] = useState(true)
+  const [currentTime, setCurrentTime] = useState<string>('')
+
+  useEffect(() => {
+    setCurrentTime(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+    const timer = setInterval(() => {
+      setCurrentTime(new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   const [donutGroup, setDonutGroup] = useState<'ticker' | 'sector'>('ticker')
 
@@ -1108,7 +1118,8 @@ export default function DashboardPage() {
         alertApi.list()
       ])
       
-      setIndices(indicesRes.data)
+      setIndices(indicesRes.data.indices || [])
+      setMarketStatus(indicesRes.data.market_status || null)
       setPerformance(performanceRes.data)
       setNews(newsRes.data)
       setAlerts(alertsRes.data)
@@ -1154,6 +1165,13 @@ export default function DashboardPage() {
     }
   }
 
+  const scrollToSection = (id: string) => {
+    const el = document.getElementById(id)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }
+
   async function handleRefresh() {
     setRefreshing(true)
     await Promise.all([refreshUser(), fetchAnalytics()])
@@ -1172,8 +1190,17 @@ export default function DashboardPage() {
     <div className="space-y-5 animate-fade-in pb-12">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-gradient-to-r from-white/[0.02] to-transparent p-5 rounded-2xl border border-white/[0.04] backdrop-blur-md shadow-2xl relative overflow-hidden group">
+        {/* Ambient Time Glow Backdrop */}
+        <div className={`absolute -left-10 -top-10 w-44 h-44 rounded-full blur-[80px] pointer-events-none opacity-45 mix-blend-screen transition-colors duration-1000 ${
+          new Date().getHours() < 12 
+            ? 'bg-amber-400/20' 
+            : new Date().getHours() < 17 
+              ? 'bg-orange-400/20' 
+              : 'bg-indigo-400/30'
+        }`} />
         <div className="absolute inset-0 bg-gradient-to-r from-brand-500/5 to-transparent opacity-50 pointer-events-none" />
-        <div className="flex items-center gap-4 relative z-10">
+        
+        <div className="flex items-center gap-4 relative z-10 flex-wrap md:flex-nowrap">
           {/* Dynamic Greeting Icon Box */}
           <div className="w-12 h-12 rounded-2xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-center shadow-inner relative group-hover:border-white/10 transition-colors duration-300">
             {new Date().getHours() < 12 ? (
@@ -1181,61 +1208,241 @@ export default function DashboardPage() {
             ) : new Date().getHours() < 17 ? (
               <Sun className="w-5.5 h-5.5 text-orange-400 animate-pulse" />
             ) : (
-              <Moon className="w-5 h-5 text-indigo-300 animate-pulse" />
+              <Moon className="w-5.5 h-5.5 text-indigo-300 animate-pulse" />
             )}
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{greeting()}</span>
-              <span className="w-1 h-1 rounded-full bg-brand-500/60" />
-              <span className="text-[10px] text-gray-500 font-mono">
+            <div className="flex items-center gap-2 flex-wrap text-[10px] text-gray-500 font-mono">
+              <span className="text-gray-400 font-semibold">
                 {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
               </span>
+              {currentTime && (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-white/10" />
+                  <span className="text-gray-400 bg-white/[0.02] border border-white/[0.04] px-1.5 py-0.5 rounded-md shadow-inner">{currentTime}</span>
+                </>
+              )}
+              {marketStatus && (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-white/10" />
+                  <span className={`inline-flex items-center gap-1.5 font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                    marketStatus.is_open 
+                      ? 'bg-brand-500/10 text-brand-400 border border-brand-500/15 shadow-[0_0_10px_rgba(38,163,102,0.06)]' 
+                      : 'bg-red-500/10 text-red-400 border border-red-500/15'
+                  }`}>
+                    <span className={marketStatus.is_open ? 'dot-live' : 'dot-live-red'} />
+                    {marketStatus.message}
+                  </span>
+                </>
+              )}
             </div>
-            <h1 className="text-2xl font-extrabold tracking-tight mt-0.5 flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight mt-1.5 flex items-center gap-2">
+              <span className="text-gray-400 font-medium">{greeting()},</span>
               <span className="bg-gradient-to-r from-white via-gray-100 to-gray-400 bg-clip-text text-transparent">
                 {user?.name?.split(' ')[0]}
               </span>
-              <span className="inline-block origin-bottom-right duration-1000">👋</span>
+              <span className="inline-block origin-bottom-right animate-wave cursor-default">👋</span>
             </h1>
           </div>
+
+          {/* Quick Stats Panel */}
+          <div className="hidden lg:flex items-center gap-3 border-l border-white/[0.06] pl-6 ml-2 select-none">
+            {/* Active Alerts Pill */}
+            <div 
+              onClick={() => scrollToSection('dashboard-alerts')}
+              className="flex items-center gap-3.5 px-3 py-1.5 rounded-xl border border-white/[0.03] bg-white/[0.01] hover:bg-amber-500/[0.02] hover:border-amber-500/20 hover:shadow-[0_0_12px_rgba(251,191,36,0.04)] transition-all duration-300 cursor-pointer hover:scale-[1.02] active:scale-[0.98] group/stat"
+              title="Click to view active alerts"
+            >
+              <div className="w-8 h-8 rounded-lg bg-amber-500/5 flex items-center justify-center text-amber-500 shadow-inner group-hover/stat:bg-amber-500/10 transition-colors duration-300">
+                <Bell size={13} className={alerts.filter(a => a.is_active).length > 0 ? 'animate-bounce' : ''} />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] uppercase font-extrabold text-gray-500 tracking-wider leading-none">Active Alerts</span>
+                <span className="text-sm font-bold text-white font-mono mt-1.5 leading-none">
+                  {alerts.filter(a => a.is_active).length}
+                </span>
+              </div>
+            </div>
+
+            {/* Positions Pill */}
+            <div 
+              onClick={() => scrollToSection('dashboard-holdings')}
+              className="flex items-center gap-3.5 px-3 py-1.5 rounded-xl border border-white/[0.03] bg-white/[0.01] hover:bg-brand-500/[0.02] hover:border-brand-500/20 hover:shadow-[0_0_12px_rgba(38,163,102,0.04)] transition-all duration-300 cursor-pointer hover:scale-[1.02] active:scale-[0.98] group/stat"
+              title="Click to view holdings"
+            >
+              <div className="w-8 h-8 rounded-lg bg-brand-500/5 flex items-center justify-center text-brand-400 shadow-inner group-hover/stat:bg-brand-500/10 transition-colors duration-300">
+                <Briefcase size={13} />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] uppercase font-extrabold text-gray-500 tracking-wider leading-none">Positions</span>
+                <span className="text-sm font-bold text-white font-mono mt-1.5 leading-none">
+                  {portfolio.length}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
+        
         <div className="flex items-center gap-2 relative z-10">
-          <button onClick={handleRefresh} disabled={refreshing} className="btn-outline flex items-center gap-2 text-xs bg-white/[0.01] hover:bg-white/[0.04] border-white/5 hover:border-white/10 py-2.5 px-4 transition-all duration-300 rounded-xl">
-            <RefreshCw size={13} className={refreshing ? 'animate-spin text-brand-400' : ''} />
+          <button onClick={handleRefresh} disabled={refreshing} className="btn-outline flex items-center gap-2 text-xs bg-white/[0.01] hover:bg-white/[0.04] border-white/5 hover:border-white/10 py-2.5 px-4 transition-all duration-300 rounded-xl group/btn">
+            <RefreshCw size={13} className={`${refreshing ? 'animate-spin' : 'group-hover/btn:rotate-180'} text-brand-400 transition-transform duration-500`} />
             Refresh
           </button>
-          <button onClick={() => setShowAddModal(true)} className="btn-primary flex items-center gap-2 text-xs py-2.5 px-4 rounded-xl shadow-[0_0_20px_rgba(38,163,102,0.12)] hover:shadow-[0_0_25px_rgba(38,163,102,0.22)] transition-all duration-300">
+          <button onClick={() => setShowAddModal(true)} className="btn-primary flex items-center gap-2 text-xs py-2.5 px-4 rounded-xl shadow-[0_0_20px_rgba(38,163,102,0.12)] hover:shadow-[0_0_25px_rgba(38,163,102,0.22)] transition-all duration-300 border border-brand-400/20 hover:scale-[1.02]">
             <Plus size={14} /> Add Stock
           </button>
         </div>
       </div>
 
-      {/* Indices Ticker */}
-      {indices.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-slide-up">
-          {indices.map(idx => {
-            const isPos = idx.change >= 0
-            return (
-              <div key={idx.symbol} className="card flex items-center justify-between py-3 relative overflow-hidden border-white/5 bg-white/[0.02] backdrop-blur-md hover:border-white/10 transition-all duration-300">
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isPos ? 'bg-brand-500/10 text-brand-400' : 'bg-red-500/10 text-red-400'}`}>
-                    <Activity size={14} />
+      {/* Indices Ticker (Scrolling Marquee) or Loading/Error State */}
+      {loadingAnalytics ? (
+        <div className="h-[60px] w-full skeleton animate-pulse rounded-2xl border border-white/[0.04]" />
+      ) : indices.length > 0 ? (
+        <div className="relative w-full overflow-hidden py-3 border-y border-white/[0.04] bg-gradient-to-r from-white/[0.01] via-transparent to-white/[0.01] backdrop-blur-sm rounded-2xl select-none group/marquee animate-fade-in">
+          {/* Gradient Overlays for Fadeout edges */}
+          <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-black/90 to-transparent z-20 pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 w-16 bg-gradient-to-l from-black/90 to-transparent z-20 pointer-events-none" />
+          
+          <div className="flex whitespace-nowrap animate-marquee group-hover/marquee:[animation-play-state:paused] gap-4">
+            {/* First Render */}
+            <div className="flex gap-4 shrink-0">
+              {indices.map(idx => {
+                const isPos = idx.change >= 0
+                const isCryptoOrComm = ['BTC-USD', 'GCF', 'CLF'].includes(idx.symbol)
+                const prefix = isCryptoOrComm ? '$' : '₹'
+                const formatLocale = isCryptoOrComm ? 'en-US' : 'en-IN'
+                
+                return (
+                  <div key={`${idx.symbol}-1`} className={`inline-flex items-center gap-3.5 px-4 py-2 rounded-xl border border-white/[0.04] bg-white/[0.015] backdrop-blur-md shadow-lg shrink-0 transition-all duration-300 ${
+                    isPos 
+                      ? 'hover:border-brand-500/30 hover:bg-brand-500/[0.02] hover:shadow-[0_0_15px_rgba(38,163,102,0.05)]' 
+                      : 'hover:border-red-500/30 hover:bg-red-500/[0.02] hover:shadow-[0_0_15px_rgba(239,68,68,0.05)]'
+                  }`}>
+                    <div>
+                      <span className="text-[9px] uppercase font-bold tracking-wider text-gray-500 block leading-none">{idx.name}</span>
+                      <span className="text-xs font-extrabold text-white font-mono mt-1.5 block leading-none">
+                        {prefix}{idx.price.toLocaleString(formatLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    
+                    {idx.sparkline && idx.sparkline.length > 0 && (
+                      <div className="h-5 w-12 opacity-70 shrink-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={idx.sparkline.map(p => ({ price: p }))} margin={{ top: 1, bottom: 1, left: 1, right: 1 }}>
+                            <defs>
+                              <filter id={`laser-glow-${idx.symbol}-1`} x="-20%" y="-20%" width="140%" height="140%">
+                                <feGaussianBlur stdDeviation="1" result="blur" />
+                                <feMerge>
+                                  <feMergeNode in="blur" />
+                                  <feMergeNode in="SourceGraphic" />
+                                </feMerge>
+                              </filter>
+                            </defs>
+                            <Area
+                              type="monotone"
+                              dataKey="price"
+                              stroke={isPos ? '#26a366' : '#ef4444'}
+                              strokeWidth={1.5}
+                              fill="none"
+                              dot={false}
+                              filter={`url(#laser-glow-${idx.symbol}-1)`}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                    
+                    <div className="text-right flex flex-col items-end shrink-0">
+                      <span className={`inline-flex items-center text-[10px] font-mono font-bold leading-none ${isPos ? 'text-brand-400' : 'text-red-400'}`}>
+                        {isPos ? '▲' : '▼'} {isPos ? '+' : ''}{idx.change_percent.toFixed(2)}%
+                      </span>
+                      <span className="text-[9px] text-gray-500 font-mono mt-1 leading-none font-semibold">
+                        {prefix}{idx.change > 0 ? '+' : ''}{idx.change.toLocaleString(formatLocale, { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-gray-500">{idx.name}</span>
-                    <div className="text-sm font-bold text-white font-mono mt-0.5">₹{idx.price.toLocaleString('en-IN')}</div>
+                )
+              })}
+            </div>
+            
+            {/* Duplicate Render for Seamless Scrolling */}
+            <div className="flex gap-4 shrink-0" aria-hidden="true">
+              {indices.map(idx => {
+                const isPos = idx.change >= 0
+                const isCryptoOrComm = ['BTC-USD', 'GCF', 'CLF'].includes(idx.symbol)
+                const prefix = isCryptoOrComm ? '$' : '₹'
+                const formatLocale = isCryptoOrComm ? 'en-US' : 'en-IN'
+                
+                return (
+                  <div key={`${idx.symbol}-2`} className={`inline-flex items-center gap-3.5 px-4 py-2 rounded-xl border border-white/[0.04] bg-white/[0.015] backdrop-blur-md shadow-lg shrink-0 transition-all duration-300 ${
+                    isPos 
+                      ? 'hover:border-brand-500/30 hover:bg-brand-500/[0.02] hover:shadow-[0_0_15px_rgba(38,163,102,0.05)]' 
+                      : 'hover:border-red-500/30 hover:bg-red-500/[0.02] hover:shadow-[0_0_15px_rgba(239,68,68,0.05)]'
+                  }`}>
+                    <div>
+                      <span className="text-[9px] uppercase font-bold tracking-wider text-gray-500 block leading-none">{idx.name}</span>
+                      <span className="text-xs font-extrabold text-white font-mono mt-1.5 block leading-none">
+                        {prefix}{idx.price.toLocaleString(formatLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    
+                    {idx.sparkline && idx.sparkline.length > 0 && (
+                      <div className="h-5 w-12 opacity-70 shrink-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={idx.sparkline.map(p => ({ price: p }))} margin={{ top: 1, bottom: 1, left: 1, right: 1 }}>
+                            <defs>
+                              <filter id={`laser-glow-${idx.symbol}-2`} x="-20%" y="-20%" width="140%" height="140%">
+                                <feGaussianBlur stdDeviation="1" result="blur" />
+                                <feMerge>
+                                  <feMergeNode in="blur" />
+                                  <feMergeNode in="SourceGraphic" />
+                                </feMerge>
+                              </filter>
+                            </defs>
+                            <Area
+                              type="monotone"
+                              dataKey="price"
+                              stroke={isPos ? '#26a366' : '#ef4444'}
+                              strokeWidth={1.5}
+                              fill="none"
+                              dot={false}
+                              filter={`url(#laser-glow-${idx.symbol}-2)`}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                    
+                    <div className="text-right flex flex-col items-end shrink-0">
+                      <span className={`inline-flex items-center text-[10px] font-mono font-bold leading-none ${isPos ? 'text-brand-400' : 'text-red-400'}`}>
+                        {isPos ? '▲' : '▼'} {isPos ? '+' : ''}{idx.change_percent.toFixed(2)}%
+                      </span>
+                      <span className="text-[9px] text-gray-500 font-mono mt-1 leading-none font-semibold">
+                        {prefix}{idx.change > 0 ? '+' : ''}{idx.change.toLocaleString(formatLocale, { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div className="text-right">
-                  <span className={`text-xs font-mono font-semibold px-2 py-0.5 rounded-full ${isPos ? 'bg-brand-500/10 text-brand-400' : 'bg-red-500/10 text-red-400'}`}>
-                    {isPos ? '▲' : '▼'} {isPos ? '+' : ''}{idx.change_percent.toFixed(2)}%
-                  </span>
-                  <div className="text-[10px] text-gray-500 font-mono mt-1">₹{idx.change > 0 ? '+' : ''}{idx.change.toLocaleString('en-IN')}</div>
-                </div>
-              </div>
-            )
-          })}
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="card flex items-center justify-between p-4 border-red-500/20 bg-red-500/[0.02] backdrop-blur-md rounded-2xl relative overflow-hidden animate-fade-in">
+          <div className="absolute inset-0 bg-gradient-to-r from-red-500/5 to-transparent pointer-events-none" />
+          <div className="flex items-center gap-3 relative z-10">
+            <div className="w-8 h-8 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center shadow-[0_0_15px_rgba(239,68,68,0.1)]">
+              <ShieldAlert size={15} />
+            </div>
+            <div>
+              <span className="text-[9px] uppercase font-bold tracking-wider text-red-400 block leading-none">Market Feed Connection Error</span>
+              <p className="text-[11px] text-gray-400 mt-1 leading-none font-semibold">Live indices are temporarily unavailable. Please retry the connection.</p>
+            </div>
+          </div>
+          <button onClick={handleRefresh} disabled={refreshing} className="btn-outline flex items-center gap-1.5 text-[9px] uppercase font-bold py-2 px-3 rounded-lg border-red-500/20 hover:border-red-500/40 text-red-400 hover:bg-red-500/10 transition-all duration-300 relative z-10">
+            <RefreshCw size={11} className={refreshing ? 'animate-spin' : ''} />
+            Retry Feed
+          </button>
         </div>
       )}
 
@@ -1317,7 +1524,7 @@ export default function DashboardPage() {
           )}
 
           {/* Holdings grid */}
-          <div className="card border-white/5 bg-white/[0.02] backdrop-blur-md">
+          <div id="dashboard-holdings" className="card border-white/5 bg-white/[0.02] backdrop-blur-md">
             <div className="flex items-center justify-between mb-4">
               <h3 className="section-title"><BarChart2 size={14} /> Holdings</h3>
               {portfolio.length > 0 && (
@@ -1426,12 +1633,14 @@ export default function DashboardPage() {
             </div>
 
             {/* Active Alerts Card */}
-            <ActiveAlertsCard
-              alerts={alerts}
-              loading={loadingAlerts}
-              onToggle={handleToggleAlert}
-              onDelete={handleDeleteAlert}
-            />
+            <div id="dashboard-alerts" className="w-full">
+              <ActiveAlertsCard
+                alerts={alerts}
+                loading={loadingAlerts}
+                onToggle={handleToggleAlert}
+                onDelete={handleDeleteAlert}
+              />
+            </div>
           </div>
         </div>
 

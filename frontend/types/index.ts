@@ -122,6 +122,7 @@ export interface MarketIndex {
   prev_close: number
   change: number
   change_percent: number
+  sparkline?: number[]
 }
 
 export interface NewsArticle {
