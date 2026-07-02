@@ -98,6 +98,7 @@ export const copilotApi = {
   runScreener: (type: string) => api.post('/copilot/screener', { screener_type: type }),
   getEarnings: (ticker: string) => api.get(`/copilot/earnings/${ticker}`),
   getRecommendations: () => api.get('/copilot/recommendations'),
+  getPortfolioAiInsights: () => api.get('/copilot/portfolio/ai-insights'),
   getInvestAssistant: (ticker: string) => api.get(`/copilot/invest-assistant/${ticker}`),
 }
 

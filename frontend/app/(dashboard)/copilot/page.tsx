@@ -8,6 +8,7 @@ import {
 import { copilotApi } from '@/lib/api'
 import toast from 'react-hot-toast'
 import ConfirmModal from '@/components/ui/ConfirmModal'
+import Link from 'next/link'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -102,6 +103,29 @@ export default function CopilotPage() {
   // ── Recommendations State ──────────────────────────────────
   const [recsData, setRecsData] = useState<any>(null)
   const [recsLoading, setRecsLoading] = useState(false)
+  const [rebalanceWeights, setRebalanceWeights] = useState<{[key: string]: number}>({
+    'SBIN': 25,
+    'TATASTEEL': 25,
+    'KPEL': 30,
+    'NBCC': 20
+  })
+
+  // ── AI Portfolio Insights State ─────────────────────────────
+  const [aiInsights, setAiInsights] = useState<any>(null)
+  const [insightsLoading, setInsightsLoading] = useState(false)
+
+  async function generateAiInsights() {
+    setInsightsLoading(true)
+    try {
+      const { data } = await copilotApi.getPortfolioAiInsights()
+      setAiInsights(data)
+      toast.success('AI Portfolio Insights generated!')
+    } catch {
+      toast.error('Failed to generate AI insights')
+    } finally {
+      setInsightsLoading(false)
+    }
+  }
 
   // ── Initial Load ───────────────────────────────────────────
   useEffect(() => {
@@ -352,6 +376,19 @@ export default function CopilotPage() {
     try {
       const { data } = await copilotApi.getRecommendations()
       setRecsData(data)
+      
+      // Dynamically load rebalance positions if user has holdings
+      if (portfolioIntel?.positions?.length > 0) {
+        const initialWeights: {[key: string]: number} = {}
+        portfolioIntel.positions.forEach((pos: any) => {
+          const price = pos.current_price || pos.buy_price || 0
+          const qty = pos.quantity || 0
+          const val = price * qty
+          const wt = Math.round((val / (portfolioIntel.total_value || 1)) * 100)
+          initialWeights[pos.ticker.toUpperCase()] = wt
+        })
+        setRebalanceWeights(initialWeights)
+      }
     } catch {
       toast.error('Recommendations failed to generate')
     } finally {
@@ -376,8 +413,6 @@ export default function CopilotPage() {
             { id: 'chat', label: 'Copilot Chat' },
             { id: 'portfolio', label: 'Portfolio Intel' },
             { id: 'whatif', label: 'What-If Stress' },
-            { id: 'screener', label: 'AI Screener' },
-            { id: 'earnings', label: 'Earnings Agent' },
             { id: 'recommendations', label: 'Recommender' }
           ] as const).map(tab => (
             <button
@@ -634,6 +669,86 @@ export default function CopilotPage() {
                   </div>
                 </div>
 
+                {/* 🚀 AI Portfolio Insights Engine */}
+                <div className="md:col-span-3 card bg-black/60 border border-white/5 space-y-4 pt-5 mt-2 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-[150px] h-[150px] bg-brand-500/[0.02] blur-2xl rounded-full pointer-events-none" />
+                  
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+                    <div>
+                      <h3 className="text-sm font-bold text-white uppercase flex items-center gap-1.5">
+                        <Sparkles className="text-brand-400 animate-pulse" size={14} /> AI Portfolio Insights Engine
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-0.5">Generate deep strategic reviews, tail-risk stress audits, and capital reallocation alerts using Groq Llama 3.</p>
+                    </div>
+                    <button
+                      onClick={generateAiInsights}
+                      disabled={insightsLoading}
+                      className="px-4 py-2 bg-brand-500 hover:bg-brand-600 disabled:bg-gray-800 disabled:text-gray-500 rounded-xl text-xs font-bold text-white transition-all active:scale-95 flex items-center gap-2 shadow-md shadow-brand-500/10 shrink-0"
+                    >
+                      {insightsLoading ? (
+                        <>
+                          <RefreshCw className="animate-spin" size={14} /> Generating Insights...
+                        </>
+                      ) : (
+                        <>
+                          <Bot size={14} /> Generate AI Insights
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {insightsLoading ? (
+                    <div className="py-12 text-center space-y-2">
+                      <div className="inline-block relative w-8 h-8">
+                        <div className="absolute inset-0 border-2 border-brand-500/20 rounded-full" />
+                        <div className="absolute inset-0 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                      <p className="text-xs text-gray-500 animate-pulse">Groq AI Agent parsing holdings telemetry, sector exposure weights, and risk parameters...</p>
+                    </div>
+                  ) : aiInsights ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2 animate-slide-up">
+                      {/* Strategic Review Card */}
+                      <div className="p-4 bg-white/[0.01] border border-white/[0.03] rounded-2xl space-y-2 hover:border-white/10 transition-colors duration-300">
+                        <h4 className="text-xs font-bold text-brand-400 uppercase tracking-wider">Strategic Allocation Review</h4>
+                        <p className="text-xs text-gray-300 leading-relaxed font-sans">{aiInsights.strategic_review}</p>
+                      </div>
+                      
+                      {/* Tail-Risk Analysis Card */}
+                      <div className="p-4 bg-white/[0.01] border border-white/[0.03] rounded-2xl space-y-2 hover:border-white/10 transition-colors duration-300">
+                        <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider">Tail-Risk Analysis</h4>
+                        <p className="text-xs text-gray-300 leading-relaxed font-sans">{aiInsights.risk_analysis}</p>
+                      </div>
+                      
+                      {/* Opportunities Card */}
+                      <div className="p-4 bg-white/[0.01] border border-white/[0.03] rounded-2xl space-y-2 hover:border-white/10 transition-colors duration-300">
+                        <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider">Reallocation Opportunities</h4>
+                        <p className="text-xs text-gray-300 leading-relaxed font-sans">{aiInsights.opportunities}</p>
+                      </div>
+
+                      {/* Tactical Action Bullet List */}
+                      {aiInsights.tactical_actions && aiInsights.tactical_actions.length > 0 && (
+                        <div className="md:col-span-3 p-4 bg-brand-500/[0.02] border border-brand-500/10 rounded-2xl space-y-3">
+                          <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                            <CheckCircle size={12} className="text-brand-400" /> Prescribed Tactical Reallocations
+                          </h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-300 font-sans">
+                            {aiInsights.tactical_actions.map((act: string, idx: number) => (
+                              <div key={idx} className="flex items-start gap-2 bg-black/40 p-2.5 rounded-xl border border-white/5">
+                                <span className="text-brand-400 font-bold shrink-0">{idx + 1}.</span>
+                                <p className="leading-normal">{act}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="py-8 text-center text-xs text-gray-500 font-semibold">
+                      Click "Generate AI Insights" above to synthesize holding intelligence using Llama 3.3.
+                    </div>
+                  )}
+                </div>
+
               </div>
             ) : (
               <div className="card text-center py-12 text-xs text-gray-500">Failed to calculate health analytics.</div>
@@ -841,218 +956,184 @@ export default function CopilotPage() {
           </div>
         )}
 
-        {/* ── TAB 4: AI STOCK SCREENER ────────────────────────── */}
-        {activeTab === 'screener' && (
-          <div className="space-y-6">
-            <div className="card bg-white/[0.01] border-white/5 space-y-4">
-              <div>
-                <h3 className="text-sm font-semibold text-white">AI Stock Screener</h3>
-                <p className="text-xs text-gray-500 mt-0.5">Filter database equities against core financial criteria paired with AI highlights.</p>
+        {/* ── TAB 4: RECOMMENDATION ENGINE ────────────────────── */}
+        {activeTab === 'recommendations' && (
+          <div className="space-y-6 animate-slide-up">
+            {recsLoading ? (
+              <div className="card text-center py-16 flex flex-col items-center justify-center gap-3 bg-white/[0.01] border-white/5">
+                <RefreshCw className="animate-spin text-brand-500" size={24} />
+                <span className="text-xs text-gray-500">Analyzing watchlist indicators, capital allocation weights, and valuation multipliers...</span>
               </div>
+            ) : recsData ? (
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                
+                {/* Left Columns: Recommendations List */}
+                <div className="xl:col-span-2 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-base font-black text-white tracking-tight uppercase">AI Action Items & Recommendations</h3>
+                      <p className="text-xs text-gray-500 mt-0.5">Tactical reallocation actions generated dynamically based on active technical indicators.</p>
+                    </div>
+                    <button
+                      onClick={loadRecommendations}
+                      className="p-2 bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 rounded-lg text-gray-400 hover:text-white transition-all text-xs flex items-center gap-1.5 active:scale-95"
+                    >
+                      <RefreshCw size={12} /> Sync Recommender
+                    </button>
+                  </div>
 
-              {/* Selection Pills */}
-              <div className="flex flex-wrap gap-2 pt-2 border-b border-surface-border/50 pb-4">
-                {([
-                  { type: 'growth', label: '🚀 Growth Opportunities' },
-                  { type: 'value', label: '💎 Traditional Value' },
-                  { type: 'dividend', label: '💵 High Yield Dividend' },
-                  { type: 'momentum', label: '📈 Relative Momentum' },
-                  { type: 'undervalued', label: '🔥 Undervalued compounders' }
-                ] as const).map(pill => (
-                  <button
-                    key={pill.type}
-                    onClick={() => {
-                      setScreenerType(pill.type)
-                      runScreener(pill.type)
-                    }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                      screenerType === pill.type
-                        ? 'bg-brand-500/10 border-brand-500/30 text-brand-400'
-                        : 'border-white/5 hover:border-white/10 hover:bg-white/[0.01] text-gray-400'
-                    }`}
-                  >
-                    {pill.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Loader */}
-              {screenerLoading && (
-                <div className="text-center py-12 flex flex-col items-center justify-center gap-2">
-                  <RefreshCw className="animate-spin text-brand-500" size={20} />
-                  <span className="text-xs text-gray-500">Querying database matching criteria…</span>
-                </div>
-              )}
-
-              {/* Screener Results */}
-              {!screenerLoading && screenerData && (
-                <div className="space-y-4 pt-2 animate-slide-up">
-                  <p className="text-xs text-gray-400 italic">Screener Details: {screenerData.description}</p>
-                  
-                  {screenerData.stocks.length === 0 ? (
-                    <div className="text-center py-6 text-xs text-gray-500">No stocks matching criteria found in database.</div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {screenerData.stocks.map((stk: any, i: number) => (
-                        <div key={i} className="p-4 bg-white/[0.01] border border-white/[0.03] rounded-2xl space-y-3 relative overflow-hidden hover:border-brand-500/20 transition-all duration-300">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2.5">
-                              <span className="text-xs font-bold text-white uppercase bg-white/[0.03] border border-white/5 px-2 py-0.5 rounded">
-                                {stk.ticker}
-                              </span>
-                              <span className="text-[10px] text-gray-500 font-mono">{stk.sector}</span>
+                  <div className="space-y-3">
+                    {recsData.recommendations.map((rec: any, i: number) => {
+                      const isPortfolio = rec.type === 'portfolio'
+                      const isWatchlist = rec.type === 'watchlist'
+                      return (
+                        <div 
+                          key={i} 
+                          className={`p-4 bg-black/60 backdrop-blur-md border rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:border-white/15 transition-all duration-300 ${
+                            rec.impact === 'High' ? 'border-red-500/10 shadow-[0_0_20px_rgba(239,68,68,0.02)]' :
+                            'border-white/5 shadow-md'
+                          }`}
+                        >
+                          <div className="flex items-start gap-4">
+                            <div className={`p-3 rounded-xl border shrink-0 ${
+                              isPortfolio ? 'bg-red-500/10 border-red-500/20 text-red-400' :
+                              isWatchlist ? 'bg-brand-500/10 border-brand-500/20 text-brand-400' :
+                              'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                            }`}>
+                              {isPortfolio ? <ShieldAlert size={18} /> :
+                               isWatchlist ? <TrendingUp size={18} /> :
+                               <Layers size={18} />}
                             </div>
-                            <span className="text-xs font-bold text-white font-mono">₹{stk.current_price?.toLocaleString('en-IN')}</span>
+
+                            <div className="space-y-1.5">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-xs font-bold text-white tracking-tight">{rec.action}</span>
+                                <span className={`text-[9px] font-black tracking-wider px-2 py-0.5 rounded uppercase ${
+                                  rec.impact === 'High' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                                  rec.impact === 'Medium' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                  'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                }`}>
+                                  {rec.impact} Impact
+                                </span>
+                                {rec.ticker && rec.ticker !== 'PORTFOLIO' && (
+                                  <Link href={`/stock/${rec.ticker}`} className="text-[9px] font-mono font-bold text-brand-400 bg-brand-500/5 border border-brand-500/20 px-1.5 py-0.5 rounded hover:bg-brand-500/10 transition-colors uppercase">
+                                    {rec.ticker}
+                                  </Link>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-400 leading-relaxed max-w-xl">{rec.desc}</p>
+                              
+                              {/* Render Metrics Badges */}
+                              {rec.metrics && (
+                                <div className="flex flex-wrap gap-2 pt-1 font-mono text-[9px]">
+                                  {Object.entries(rec.metrics).map(([key, val]: any) => (
+                                    <div key={key} className="bg-white/[0.02] border border-white/5 rounded px-2 py-0.5 text-gray-500">
+                                      {key}: <span className="text-white font-bold">{val}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </div>
 
-                          <div className="grid grid-cols-3 gap-2 text-[10px] text-gray-400 font-mono bg-black/20 p-2 rounded-xl">
-                            <div>P/E: <span className="text-white font-bold">{stk.pe ? `${stk.pe}x` : 'N/A'}</span></div>
-                            <div>ROCE: <span className="text-white font-bold">{stk.roce ? `${stk.roce}%` : 'N/A'}</span></div>
-                            <div>Yield: <span className="text-white font-bold">{stk.dividend_yield ? `${stk.dividend_yield}%` : '0%'}</span></div>
-                          </div>
-
-                          {/* AI Narrative highlight */}
-                          <div className="p-3 bg-brand-500/5 border border-brand-500/10 rounded-xl flex items-start gap-2.5 text-[11px] text-brand-300 leading-relaxed font-semibold">
-                            <Sparkles size={12} className="shrink-0 mt-0.5 text-brand-400" />
-                            <p>{stk.ai_highlight}</p>
+                          {/* Quick Simulated Actions */}
+                          <div className="flex items-center gap-2 self-end sm:self-center">
+                            {rec.ticker && rec.ticker !== 'PORTFOLIO' && (
+                              <button 
+                                onClick={() => toast.success(`Simulated limit buy order of ₹10,000 for ${rec.ticker} triggered!`)}
+                                className="px-3 py-1.5 bg-brand-500 hover:bg-brand-600 rounded-lg text-[10px] font-semibold text-white transition-all active:scale-95 shadow-md shadow-brand-500/10"
+                              >
+                                Buy Simulation
+                              </button>
+                            )}
+                            {isPortfolio && rec.action === 'Trim Concentration' && (
+                              <button 
+                                onClick={() => toast.success(`Simulated sale order of ${rec.metrics?.['Trim Qty'] || 'shares'} triggered for ${rec.ticker}!`)}
+                                className="px-3 py-1.5 bg-red-500 hover:bg-red-600 rounded-lg text-[10px] font-semibold text-white transition-all active:scale-95 shadow-md shadow-red-500/10"
+                              >
+                                Trim Position
+                              </button>
+                            )}
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      )
+                    })}
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
-        )}
 
-        {/* ── TAB 5: EARNINGS AGENT ───────────────────────────── */}
-        {activeTab === 'earnings' && (
-          <div className="space-y-6">
-            <div className="card bg-white/[0.01] border-white/5 space-y-4">
-              <div>
-                <h3 className="text-sm font-semibold text-white">Earnings Intelligence Agent</h3>
-                <p className="text-xs text-gray-500 mt-0.5">Parse recent quarterly financials, sentiment indicators, and guidance outputs.</p>
-              </div>
+                {/* Right Column: Sector Exposure Auditor */}
+                <div className="xl:col-span-1 space-y-4">
+                  <div>
+                    <h3 className="text-base font-black text-white tracking-tight uppercase">AI Sector Optimizer</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">Audits sector concentrations against targets to suggest balancing entries.</p>
+                  </div>
 
-              {/* Ticker Search input */}
-              <form onSubmit={searchEarnings} className="flex gap-2 max-w-sm pt-2">
-                <input
-                  type="text"
-                  placeholder="Enter Ticker (e.g. SIGMAADV)"
-                  value={earningsTicker}
-                  onChange={(e) => setEarningsTicker(e.target.value.toUpperCase())}
-                  disabled={earningsLoading}
-                  className="input bg-black border border-white/10"
-                />
-                <button
-                  type="submit"
-                  disabled={earningsLoading || !earningsTicker.trim()}
-                  className="btn-primary py-2 px-4 rounded-xl flex items-center justify-center gap-2 hover:shadow-[0_0_15px_rgba(38,163,102,0.15)] transition-all shrink-0 text-xs font-semibold"
-                >
-                  {earningsLoading ? <RefreshCw className="animate-spin" size={14} /> : <Search size={14} />}
-                  Analyze
-                </button>
-              </form>
-            </div>
+                  <div className="p-5 rounded-2xl bg-black/60 border border-white/5 space-y-4 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-[100px] h-[100px] bg-brand-500/[0.01] blur-xl rounded-full pointer-events-none" />
+                    
+                    {/* Render active sector audits */}
+                    <div className="space-y-3.5">
+                      {(portfolioIntel?.sector_exposure?.length > 0 ? portfolioIntel.sector_exposure : [
+                        { sector: 'Financial Services', percentage: 40.0, value: 400000 },
+                        { sector: 'Infrastructure', percentage: 25.0, value: 250000 },
+                        { sector: 'Green Energy', percentage: 35.0, value: 350000 }
+                      ]).map((sec: any, idx: number) => {
+                        const isOver = sec.percentage > 30
+                        const isUnder = sec.percentage < 15
+                        return (
+                          <div key={idx} className="p-3 bg-white/[0.02] border border-white/5 rounded-xl space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-white uppercase">{sec.sector}</span>
+                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase ${
+                                isOver ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                                isUnder ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                'bg-brand-500/10 text-brand-400 border border-brand-500/20'
+                              }`}>
+                                {isOver ? '⚠️ Overexposed' : isUnder ? '💡 Opportunity' : '✅ Optimal'}
+                              </span>
+                            </div>
+                            
+                            <div className="flex items-center justify-between text-[10px] text-gray-400 font-mono">
+                              <span>Allocation Exposure:</span>
+                              <span className="text-white font-bold">{sec.percentage}%</span>
+                            </div>
 
-            {/* Results card */}
-            {earningsData && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-slide-up">
-                
-                {/* Sentiment & Outlook overview */}
-                <div className="md:col-span-1 space-y-6">
-                  {/* Sentiment summary */}
-                  <div className="card bg-white/[0.01] border-white/5 space-y-4">
-                    <h3 className="section-title text-white">Earnings Sentiment</h3>
-                    <div className="flex items-center justify-between pt-2">
-                      <div>
-                        <span className="text-[9px] uppercase font-bold text-gray-500">Maturity Sentiment</span>
-                        <div className={`text-2xl font-extrabold mt-0.5 ${
-                          earningsData.sentiment === 'Positive' ? 'text-brand-400' : 
-                          (earningsData.sentiment === 'Negative' ? 'text-red-400' : 'text-gray-400')
-                        }`}>{earningsData.sentiment}</div>
-                      </div>
-                      <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-gray-400 border border-white/10 font-bold font-mono">
-                        {earningsData.sentiment === 'Positive' ? '▲' : (earningsData.sentiment === 'Negative' ? '▼' : '■')}
-                      </div>
+                            <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                              <div 
+                                className={`h-full rounded-full ${isOver ? 'bg-red-500' : isUnder ? 'bg-amber-500' : 'bg-brand-500'}`}
+                                style={{ width: `${sec.percentage}%` }}
+                              />
+                            </div>
+
+                            {/* Custom AI Sector Action */}
+                            <p className="text-[10px] text-gray-500 italic leading-relaxed pt-1">
+                              {isOver ? `Sector is concentrated. Consider trimming high-beta exposures to redirect capital.` : 
+                               isUnder ? `Exposure is thin. Look to accumulate compounders like NBCC or SBIN to build weight.` : 
+                               `Sector allocation falls within healthy diversification bounds.`}
+                            </p>
+                          </div>
+                        )
+                      })}
                     </div>
 
-                    <div className="divider" />
-
-                    <div>
-                      <span className="text-[9px] uppercase font-bold text-gray-500">Guidance Outlook</span>
-                      <div className="text-xs font-semibold text-white mt-1">{earningsData.guidance_outlook}</div>
-                    </div>
-                    <div>
-                      <span className="text-[9px] uppercase font-bold text-gray-500">Management Confidence</span>
-                      <div className="text-xs font-semibold text-white mt-1">{earningsData.management_confidence} Level</div>
+                    <div className="pt-2 border-t border-white/5">
+                      <button 
+                        onClick={() => {
+                          toast.success("Sector balancing recommendation report compiled!")
+                        }}
+                        className="w-full py-2.5 bg-brand-500 hover:bg-brand-600 rounded-xl text-[10px] font-bold text-white transition-all uppercase tracking-wider shadow-md shadow-brand-500/10"
+                      >
+                        Generate Sector Audit PDF
+                      </button>
                     </div>
                   </div>
                 </div>
 
-                {/* Narrative Earnings Summary */}
-                <div className="md:col-span-2 card bg-white/[0.01] border-white/5 space-y-4">
-                  <h3 className="section-title text-brand-400"><Sparkles size={14} /> Synthesized Earnings Summary</h3>
-                  <p className="text-xs text-gray-200 leading-relaxed font-semibold">{earningsData.earnings_summary}</p>
-                  
-                  {earningsData.recent_quarter && (
-                    <div className="mt-4 p-4 bg-black/40 border border-white/[0.03] rounded-2xl space-y-3">
-                      <span className="text-[10px] uppercase font-bold text-gray-500 tracking-wider">Recent Quarter reported metrics</span>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-1 font-mono text-xs">
-                        <div>Sales: <span className="text-white font-bold block mt-0.5">₹{earningsData.recent_quarter.sales} Cr</span></div>
-                        <div>Net Profit: <span className="text-white font-bold block mt-0.5">₹{earningsData.recent_quarter.net_profit} Cr</span></div>
-                        <div>OPM: <span className="text-white font-bold block mt-0.5">{earningsData.recent_quarter.opm_pct}%</span></div>
-                        <div>Quarter: <span className="text-white font-bold block mt-0.5">{earningsData.recent_quarter.quarter || 'N/A'}</span></div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── TAB 6: RECOMMENDATION ENGINE ────────────────────── */}
-        {activeTab === 'recommendations' && (
-          <div className="space-y-6">
-            {recsLoading ? (
-              <div className="card text-center py-12 flex flex-col items-center justify-center gap-3">
-                <RefreshCw className="animate-spin text-brand-500" size={24} />
-                <span className="text-xs text-gray-500">Analyzing watchlist and holdings parameters…</span>
-              </div>
-            ) : recsData ? (
-              <div className="card bg-white/[0.01] border-white/5 space-y-4 animate-slide-up">
-                <div>
-                  <h3 className="text-sm font-semibold text-white">AI Portfolio Recommender</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">Personalized adjustments generated dynamically based on active technical indicators and holdings.</p>
-                </div>
-
-                <div className="space-y-3 pt-2">
-                  {recsData.recommendations.map((rec: any, i: number) => (
-                    <div key={i} className="p-4 bg-white/[0.01] border border-white/[0.03] rounded-2xl flex items-start gap-4 hover:border-white/10 transition-colors duration-300">
-                      <div className={`w-8 h-8 rounded-lg shrink-0 flex items-center justify-center text-xs font-bold border ${
-                        rec.type === 'portfolio' ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-brand-500/10 border-brand-500/20 text-brand-400'
-                      }`}>
-                        {rec.type === 'portfolio' ? 'P' : 'W'}
-                      </div>
-                      
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-white">{rec.action}</span>
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                            rec.impact === 'High' ? 'bg-red-500/15 text-red-400' : 'bg-brand-500/15 text-brand-400'
-                          }`}>{rec.impact} Impact</span>
-                        </div>
-                        <p className="text-xs text-gray-400 leading-normal">{rec.desc}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
             ) : (
-              <div className="card text-center py-12 text-xs text-gray-500">No suggestions compiled. Add tickers to watchlist or portfolio.</div>
+              <div className="card text-center py-12 text-xs text-gray-500 bg-white/[0.01] border-white/5">
+                No suggestions compiled. Add tickers to watchlist or portfolio positions.
+              </div>
             )}
           </div>
         )}

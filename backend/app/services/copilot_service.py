@@ -602,53 +602,128 @@ async def run_earnings_agent(ticker: str) -> dict:
 async def generate_portfolio_recommendations(portfolio: list, watchlist: list) -> dict:
     """Generates personalized action items to optimize watchlist and holdings."""
     recs = []
+    db = get_db()
     
-    if not portfolio:
-        recs.append({
-            "type": "portfolio",
-            "action": "Build Core Portfolio",
-            "impact": "High",
-            "ticker": "GENERAL",
-            "desc": "Your portfolio is currently empty. Add capital-efficient compounders (ROCE > 15%, P/E < 20) like SIGMAADV or other value stocks to establish your core equity holdings."
-        })
-    else:
+    # Calculate portfolio values and total
+    total_value = 0
+    if portfolio:
+        for pos in portfolio:
+            price = pos.get("current_price") or pos.get("buy_price") or 0
+            qty = pos.get("quantity") or pos.get("shares") or 0
+            total_value += price * qty
+            
+        # Check concentration risks
+        for pos in portfolio:
+            price = pos.get("current_price") or pos.get("buy_price") or 0
+            qty = pos.get("quantity") or pos.get("shares") or 0
+            val = price * qty
+            weight = val / total_value if total_value > 0 else 0
+            ticker = pos.get("ticker", "").upper()
+            if weight > 0.30:
+                recs.append({
+                    "type": "portfolio",
+                    "action": "Trim Concentration",
+                    "impact": "High",
+                    "ticker": ticker,
+                    "desc": f"Your holding in {ticker} represents {(weight*100):.1f}% of your portfolio. Trim to reduce concentration risk under 25%.",
+                    "metrics": {
+                        "Weight": f"{(weight*100):.1f}%",
+                        "Target": "20.0%",
+                        "Trim Qty": str(int(qty * (weight - 0.20) / weight))
+                    }
+                })
+                
         # Check diversification
         intel = calculate_portfolio_intelligence(portfolio)
-        
-        if intel["health_score"] < 70:
+        if intel.get("health_score", 100) < 70:
             recs.append({
                 "type": "portfolio",
                 "action": "Diversification Audit",
                 "impact": "High",
                 "ticker": "PORTFOLIO",
-                "desc": f"Your portfolio health score is low ({intel['health_score']}/100). Consider trimming concentrated holdings exceeding 30% and adding uncorrelated sector assets."
+                "desc": f"Your portfolio health rating is low ({intel['health_score']}/100) due to high concentration. Consider rebalancing.",
+                "metrics": {
+                    "Health": f"{intel['health_score']}/100",
+                    "HHI": f"{intel.get('diversification_score', 100)}/100"
+                }
             })
             
-        # Recommend additions from watchlist
+    else:
+        # Portfolio is empty
+        recs.append({
+            "type": "portfolio",
+            "action": "Build Core Portfolio",
+            "impact": "High",
+            "ticker": "PORTFOLIO",
+            "desc": "Your portfolio is currently empty. Add capital-efficient compounders to establish your core equity holdings.",
+            "metrics": {
+                "Holdings": "0",
+                "Allocation": "0% Allocated"
+            }
+        })
+
+    # Watchlist scans
+    if watchlist:
         for item in watchlist:
             ticker = item
             if isinstance(item, dict):
                 ticker = item.get("ticker")
             w_stock = await get_stock_data(ticker)
             if w_stock:
-                roce = w_stock.get("roce")
-                pe = w_stock.get("stock_pe")
-                if roce and roce > 18 and pe and pe < 18:
+                roce = w_stock.get("roce") or w_stock.get("return_on_capital_employed")
+                pe = w_stock.get("stock_pe") or w_stock.get("price_to_earnings")
+                price = w_stock.get("current_price")
+                if roce and roce > 18:
                     recs.append({
                         "type": "watchlist",
                         "action": "Accumulate Compounder",
                         "impact": "Medium",
                         "ticker": w_stock["ticker"],
-                        "desc": f"Watchlist stock {w_stock['ticker']} displays high capital efficiency (ROCE {roce}%) and attractive entry valuation (P/E {pe}x). Ideal candidate for asset allocation."
+                        "desc": f"Watchlist stock {w_stock['ticker']} displays high capital efficiency (ROCE {roce}%) and entry valuation.",
+                        "metrics": {
+                            "ROCE": f"{roce}%",
+                            "P/E": f"{pe}x" if pe else "N/A",
+                            "Price": f"₹{price}" if price else "N/A"
+                        }
                     })
 
+    # Pull top scanned multibaggers to fill slots
+    if len(recs) < 5 and db is not None:
+        try:
+            cursor = db.decision_intelligence.find({}).sort("multibagger_score", -1).limit(5)
+            top_stocks = await cursor.to_list(length=5)
+            for s in top_stocks:
+                if len(recs) >= 5:
+                    break
+                if any(r["ticker"] == s["ticker"] for r in recs):
+                    continue
+                recs.append({
+                    "type": "general",
+                    "action": "Accumulate Alpha Potential",
+                    "impact": "Medium",
+                    "ticker": s["ticker"],
+                    "desc": f"High conviction multibagger candidate {s['ticker']} scanned with potential score {s['multibagger_score']}% and projected CAGR {s['cagr']}%.",
+                    "metrics": {
+                        "Score": f"{s['multibagger_score']}%",
+                        "CAGR": f"{s['cagr']}%",
+                        "Alpha": f"{s['alpha_score']}/100"
+                    }
+                })
+        except Exception as e:
+            logger.error(f"Error loading fallback recommendations: {e}")
+
+    # Final fallback if still empty
     if not recs:
         recs.append({
             "type": "general",
             "action": "Maintain Strategy",
             "impact": "Low",
             "ticker": "PORTFOLIO",
-            "desc": "Your portfolio configuration matches optimization guidelines with healthy scores and returns profiles. Continue tracking live alert limits."
+            "desc": "Your portfolio configuration matches optimization guidelines. Continue tracking live alert limits.",
+            "metrics": {
+                "Risk": "Low Risk",
+                "Alerts": "0 Triggered"
+            }
         })
 
     return {
@@ -720,4 +795,83 @@ async def run_investment_assistant(ticker: str) -> dict:
         "bull_case": bull,
         "bear_case": bear,
         "risk_analysis": risk
+    }
+
+
+async def generate_portfolio_ai_insights(portfolio: list, watchlist: list) -> dict:
+    """Invokes Groq LLM to perform deep data-driven portfolio analysis."""
+    # 1. Compile intelligence
+    intel = calculate_portfolio_intelligence(portfolio)
+    
+    # 2. Build detailed description for the LLM
+    portfolio_desc = []
+    for pos in portfolio:
+        ticker = pos.get("ticker", "").upper()
+        qty = pos.get("quantity") or pos.get("shares") or 0
+        buy_p = pos.get("buy_price") or 0
+        curr_p = pos.get("current_price") or buy_p
+        roce = pos.get("roce") or "N/A"
+        pe = pos.get("stock_pe") or "N/A"
+        weight_pct = round(((qty * curr_p) / intel["total_value"]) * 100, 1) if intel["total_value"] > 0 else 0
+        portfolio_desc.append(
+            f"- {ticker}: {qty} shares @ ₹{curr_p} (Buy: ₹{buy_p}). Weight: {weight_pct}%, ROCE: {roce}%, P/E: {pe}x"
+        )
+        
+    sector_desc = [f"- {s['sector']}: {s['percentage']}%" for s in intel["sector_exposure"]]
+    risk_desc = [f"- {r['ticker']}: {r['flag']}" for r in intel["risk_concentration"]]
+    
+    system_prompt = (
+        "You are an elite quantitative portfolio strategist and investment copilot. "
+        "Analyze the user's equity portfolio holdings, risk parameters, and sector distributions. "
+        "Provide your analysis strictly in a valid JSON object structure containing the following keys:\n"
+        '- "strategic_review": Detailed evaluation of portfolio strengths, concentration risks, and capital structure.\n'
+        '- "risk_analysis": Stress test evaluation under high inflation, rate hikes, and sector rotation pressures.\n'
+        '- "opportunities": Recommended capital reallocation targets from watchlist stocks or general compounders.\n'
+        '- "tactical_actions": A list of 3-4 specific tactical allocation actions (bullets) to improve health score.\n'
+        "Do not include markdown outside the JSON block. Return ONLY the raw JSON object."
+    )
+    
+    user_prompt = (
+        f"Portfolio Value: ₹{intel['total_value']}\n"
+        f"Portfolio Health Rating: {intel['health_score']}/100\n"
+        f"Diversification HHI Score: {intel['diversification_score']}/100\n"
+        f"Weighted ROCE: {intel['weighted_roe']}%\n"
+        f"Weighted P/E: {intel['weighted_pe']}x\n\n"
+        "Holdings Details:\n" + "\n".join(portfolio_desc) + "\n\n"
+        "Sector Exposures:\n" + "\n".join(sector_desc) + "\n\n"
+        "Active Risk Alerts:\n" + ("\n".join(risk_desc) if risk_desc else "None detected.") + "\n\n"
+        f"Watchlist Ticker Symbols: {', '.join(watchlist) if watchlist else 'None'}"
+    )
+    
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt}
+    ]
+    
+    try:
+        response_text = await query_groq(messages, json_mode=True)
+        # Parse the JSON response
+        if response_text:
+            data = json.loads(response_text)
+            return data
+    except Exception as e:
+        logger.error(f"Error querying AI Portfolio Insights: {e}")
+        
+    # Return structured fallback if query fails or is unconfigured
+    return {
+        "strategic_review": (
+            f"Your portfolio is concentrated across {intel['holdings_count']} assets with a total current valuation of "
+            f"₹{intel['total_value']:.2f}. The capital allocation model reports a weighted ROCE of {intel['weighted_roe']}% "
+            f"and a valuation multiple of {intel['weighted_pe']}x. Watchlist parameters look healthy."
+        ),
+        "risk_analysis": (
+            f"The estimated Value at Risk max drawdown is {intel['max_drawdown_est']}%. "
+            "Valuation multiple is reasonable; monitor holdings with high multiples for rate-hike pressures."
+        ),
+        "opportunities": "Watchlist candidates offer high capital efficiency ROCE. Look for entry triggers.",
+        "tactical_actions": [
+            "Diversify concentrated positions exceeding 25% allocation weight.",
+            "Reallocate to under-weighted high-ROCE sectors to balance the portfolio.",
+            "Establish trailing stop losses on stocks trading at high valuation multiples."
+        ]
     }

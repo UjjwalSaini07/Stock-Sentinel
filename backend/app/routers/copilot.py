@@ -11,6 +11,7 @@ from app.services.copilot_service import (
     run_earnings_agent,
     generate_portfolio_recommendations,
     run_investment_assistant,
+    generate_portfolio_ai_insights,
     research_agent,
     news_agent,
     risk_agent,
@@ -294,6 +295,19 @@ async def get_recommendations(user=Depends(get_current_user)):
 
     recs = await generate_portfolio_recommendations(portfolio, watchlist)
     return recs
+
+
+@router.get("/portfolio/ai-insights")
+async def get_portfolio_ai_insights(user=Depends(get_current_user)):
+    portfolio = user.get("portfolio", [])
+    db = get_db()
+    watchlist = []
+    watchlist_doc = await db.users.find_one({"_id": user["_id"]}, {"watchlist": 1})
+    if watchlist_doc and "watchlist" in watchlist_doc:
+        watchlist = watchlist_doc["watchlist"]
+        
+    insights = await generate_portfolio_ai_insights(portfolio, watchlist)
+    return insights
 
 
 @router.get("/invest-assistant/{ticker}")
