@@ -417,27 +417,27 @@ export default function MultibaggerDiscoveryPage() {
             const qualityFactor = item.alpha_score >= 70 ? 25 : 12
             const debtFactor = item.multibagger_score >= 60 ? 20 : 12
 
-            // Circular progress calculations for the SVG circle ring
-            const radius = 19
+            // Circular progress calculations for the SVG circle ring (larger radius)
+            const radius = 22
             const circumference = 2 * Math.PI * radius
             const strokeDashoffset = circumference - (item.multibagger_score / 100) * circumference
 
             return (
               <div 
                 key={item.ticker} 
-                className={`p-5 rounded-2xl backdrop-blur-md transition-all duration-300 group relative overflow-hidden flex flex-col justify-between hover:-translate-y-0.5 active:scale-[0.99] ${
-                  index === 0 ? 'border border-amber-500/35 bg-gradient-to-br from-amber-500/[0.02] via-slate-950/95 to-slate-900/30 shadow-[0_0_35px_rgba(245,158,11,0.05)]' :
-                  index === 1 ? 'border border-slate-400/35 bg-gradient-to-br from-slate-400/[0.02] via-slate-950/95 to-slate-900/30 shadow-[0_0_35px_rgba(203,213,225,0.05)]' :
-                  index === 2 ? 'border border-amber-700/35 bg-gradient-to-br from-amber-700/[0.02] via-slate-950/95 to-slate-900/30 shadow-[0_0_35px_rgba(180,83,9,0.05)]' :
-                  'border border-white/5 bg-slate-950/65 hover:border-brand-500/20 hover:bg-slate-950/80 shadow-md'
+                className={`p-6 rounded-2xl backdrop-blur-md transition-all duration-300 group relative overflow-hidden flex flex-col justify-between hover:-translate-y-1 active:scale-[0.99] ${
+                  index === 0 ? 'border border-amber-500/35 bg-gradient-to-br from-amber-500/[0.03] via-slate-950/95 to-slate-900/40 shadow-[0_0_40px_rgba(245,158,11,0.06),inset_0_0_20px_rgba(245,158,11,0.02)]' :
+                  index === 1 ? 'border border-slate-400/35 bg-gradient-to-br from-slate-400/[0.03] via-slate-950/95 to-slate-900/40 shadow-[0_0_40px_rgba(203,213,225,0.06),inset_0_0_20px_rgba(203,213,225,0.02)]' :
+                  index === 2 ? 'border border-amber-700/35 bg-gradient-to-br from-amber-700/[0.03] via-slate-950/95 to-slate-900/40 shadow-[0_0_40px_rgba(180,83,9,0.06),inset_0_0_20px_rgba(180,83,9,0.02)]' :
+                  'border border-white/5 bg-slate-950/65 hover:border-brand-500/20 hover:bg-slate-950/80 shadow-md hover:shadow-[0_0_30px_rgba(38,163,102,0.02)]'
                 }`}
               >
                 {/* Glow Overlay */}
-                <div className={`absolute top-0 right-0 w-[130px] h-[130px] blur-[55px] pointer-events-none rounded-full transition-all duration-300 ${
-                  index === 0 ? 'bg-amber-500/[0.03] group-hover:bg-amber-500/[0.07]' :
-                  index === 1 ? 'bg-slate-400/[0.03] group-hover:bg-slate-400/[0.07]' :
-                  index === 2 ? 'bg-amber-700/[0.03] group-hover:bg-amber-700/[0.07]' :
-                  'bg-brand-500/[0.01] group-hover:bg-brand-500/[0.05]'
+                <div className={`absolute top-0 right-0 w-[150px] h-[150px] blur-[60px] pointer-events-none rounded-full transition-all duration-300 ${
+                  index === 0 ? 'bg-amber-500/[0.04] group-hover:bg-amber-500/[0.08]' :
+                  index === 1 ? 'bg-slate-400/[0.04] group-hover:bg-slate-400/[0.08]' :
+                  index === 2 ? 'bg-amber-700/[0.04] group-hover:bg-amber-700/[0.08]' :
+                  'bg-brand-500/[0.01] group-hover:bg-brand-500/[0.06]'
                 }`} />
                 
                 <div>
@@ -445,22 +445,31 @@ export default function MultibaggerDiscoveryPage() {
                   <div className="flex items-start justify-between border-b border-white/5 pb-4 mb-4">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className={`text-[9px] font-extrabold font-sans tracking-wider px-2.5 py-0.5 rounded border uppercase ${
-                          index === 0 ? 'bg-amber-500/10 text-amber-400 border-amber-500/25 shadow-[0_0_10px_rgba(245,158,11,0.08)]' :
-                          index === 1 ? 'bg-slate-400/10 text-slate-300 border-slate-400/25 shadow-[0_0_10px_rgba(203,213,225,0.08)]' :
-                          index === 2 ? 'bg-amber-750/10 text-amber-600 border-amber-750/25 shadow-[0_0_10px_rgba(180,83,9,0.08)]' :
-                          'bg-brand-500/10 text-brand-400 border-brand-500/15'
-                        }`}>
-                          {index === 0 ? '🏆 GOLD RUNNER' : index === 1 ? '🥈 SILVER MATCH' : index === 2 ? '🥉 BRONZE PEER' : `RANK #${index + 1}`}
-                        </span>
+                        {index === 0 ? (
+                          <span className="text-[9px] font-black tracking-widest px-2.5 py-0.5 rounded border border-amber-500/20 bg-amber-500/5 shadow-[0_0_10px_rgba(245,158,11,0.08)] bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent uppercase">
+                            🏆 GOLD RUNNER
+                          </span>
+                        ) : index === 1 ? (
+                          <span className="text-[9px] font-black tracking-widest px-2.5 py-0.5 rounded border border-slate-400/20 bg-slate-400/5 shadow-[0_0_10px_rgba(203,213,225,0.08)] bg-gradient-to-r from-slate-200 via-gray-300 to-slate-400 bg-clip-text text-transparent uppercase">
+                            🥈 SILVER MATCH
+                          </span>
+                        ) : index === 2 ? (
+                          <span className="text-[9px] font-black tracking-widest px-2.5 py-0.5 rounded border border-amber-700/20 bg-amber-700/5 shadow-[0_0_10px_rgba(180,83,9,0.08)] bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 bg-clip-text text-transparent uppercase">
+                            🥉 BRONZE PEER
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-extrabold tracking-wider px-2 py-0.5 rounded border border-white/10 bg-white/[0.02] text-gray-400">
+                            RANK #{index + 1}
+                          </span>
+                        )}
                         <span className="text-[10px] text-gray-500 font-semibold font-mono">
                           CAGR Proj: {item.cagr}%
                         </span>
                       </div>
-                      <h3 className="text-lg font-black text-white tracking-tight mt-2 flex items-center gap-2">
+                      <h3 className="text-xl font-black text-white tracking-tight mt-2 flex items-center gap-2">
                         {item.company_name}
                         <Link href={`/stock/${item.ticker}`} className="text-gray-500 hover:text-brand-400 transition-colors">
-                          <ExternalLink size={13} />
+                          <ExternalLink size={14} />
                         </Link>
                       </h3>
                       <p className="text-xs text-gray-400 font-mono mt-0.5">
@@ -470,34 +479,34 @@ export default function MultibaggerDiscoveryPage() {
 
                     <div className="flex items-center gap-3">
                       {/* Premium Telemetry Circular Progress Ring */}
-                      <div className="text-right flex items-center gap-2.5">
+                      <div className="text-right flex items-center gap-3">
                         <div className="hidden sm:block">
-                          <div className="text-[9px] text-gray-500 uppercase font-semibold">Multibagger</div>
+                          <div className="text-[9px] text-gray-500 uppercase font-black tracking-wider">Multibagger</div>
                           <div className="text-[9px] text-gray-400 font-mono mt-0.5">
                             Alpha: {item.alpha_score}/100
                           </div>
                         </div>
-                        <div className="relative w-12 h-12 shrink-0 flex items-center justify-center">
+                        <div className="relative w-14 h-14 shrink-0 flex items-center justify-center">
                           <svg className="w-full h-full transform -rotate-90">
                             <circle
-                              cx="24"
-                              cy="24"
-                              r="19"
+                              cx="28"
+                              cy="28"
+                              r="22"
                               className="stroke-white/[0.04]"
-                              strokeWidth="3"
+                              strokeWidth="3.5"
                               fill="transparent"
                             />
                             <circle
-                              cx="24"
-                              cy="24"
-                              r="19"
+                              cx="28"
+                              cy="28"
+                              r="22"
                               className={
-                                index === 0 ? "stroke-amber-500" :
+                                index === 0 ? "stroke-amber-400" :
                                 index === 1 ? "stroke-slate-300" :
                                 index === 2 ? "stroke-amber-700" :
                                 "stroke-brand-500"
                               }
-                              strokeWidth="3"
+                              strokeWidth="3.5"
                               fill="transparent"
                               strokeDasharray={circumference}
                               strokeDashoffset={strokeDashoffset}
@@ -505,7 +514,7 @@ export default function MultibaggerDiscoveryPage() {
                               style={{ transition: 'stroke-dashoffset 0.5s ease' }}
                             />
                           </svg>
-                          <span className="absolute text-[10px] font-black text-white font-mono">{item.multibagger_score}%</span>
+                          <span className="absolute text-xs font-black text-white font-mono">{item.multibagger_score}%</span>
                         </div>
                       </div>
 
@@ -513,7 +522,7 @@ export default function MultibaggerDiscoveryPage() {
                         {/* Watchlist toggle btn */}
                         <button
                           onClick={(e) => toggleWatchlist(item.ticker, e)}
-                          className={`p-1.5 rounded-lg border transition-all active:scale-90 ${
+                          className={`p-2 rounded-lg border transition-all active:scale-90 ${
                             inWatchlist 
                               ? 'bg-brand-500/10 border-brand-500/25 text-brand-400 shadow-[0_0_10px_rgba(38,163,102,0.06)]' 
                               : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/[0.02]'
@@ -525,7 +534,7 @@ export default function MultibaggerDiscoveryPage() {
                         {/* Delete btn */}
                         <button
                           onClick={(e) => handleDeleteStock(item.ticker, e)}
-                          className="p-1.5 rounded-lg border bg-red-500/5 border-red-500/15 text-red-400 hover:bg-red-500/20 hover:border-red-500/30 transition-all active:scale-90"
+                          className="p-2 rounded-lg border bg-red-500/5 border-red-500/15 text-red-400 hover:bg-red-500/20 hover:border-red-500/30 transition-all active:scale-90"
                           title="Delete from Platform completely"
                         >
                           <Trash2 size={12} />
@@ -540,56 +549,56 @@ export default function MultibaggerDiscoveryPage() {
                       <span>Quantitative Factor Breakdown</span>
                       <button 
                         onClick={() => setInspectItem(item)}
-                        className="text-[9px] text-brand-400 hover:underline flex items-center gap-1 font-sans capitalize"
+                        className="text-[9px] text-brand-400 hover:underline flex items-center gap-1 font-sans capitalize font-semibold"
                       >
                         <Info size={10} /> Inspect Formula
                       </button>
                     </div>
-                    <div className="grid grid-cols-4 gap-2.5 text-[9px] font-mono text-gray-400">
+                    <div className="grid grid-cols-4 gap-3 text-[9px] font-mono text-gray-400">
                       <div className="space-y-1">
-                        <div className="flex justify-between"><span>Size</span><span>{capFactor}/25</span></div>
+                        <div className="flex justify-between"><span>Size</span><span className="text-white font-bold">{capFactor}/25</span></div>
                         <div className="w-full h-1 bg-white/[0.04] rounded-full overflow-hidden">
-                          <div className="h-full bg-brand-500" style={{ width: `${(capFactor/25)*100}%` }} />
+                          <div className="h-full bg-brand-500 shadow-[0_0_6px_rgba(38,163,102,0.2)]" style={{ width: `${(capFactor/25)*100}%` }} />
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <div className="flex justify-between"><span>Growth</span><span>{growthFactor}/30</span></div>
+                        <div className="flex justify-between"><span>Growth</span><span className="text-white font-bold">{growthFactor}/30</span></div>
                         <div className="w-full h-1 bg-white/[0.04] rounded-full overflow-hidden">
-                          <div className="h-full bg-brand-500" style={{ width: `${(growthFactor/30)*100}%` }} />
+                          <div className="h-full bg-brand-500 shadow-[0_0_6px_rgba(38,163,102,0.2)]" style={{ width: `${(growthFactor/30)*100}%` }} />
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <div className="flex justify-between"><span>Returns</span><span>{qualityFactor}/25</span></div>
+                        <div className="flex justify-between"><span>Returns</span><span className="text-white font-bold">{qualityFactor}/25</span></div>
                         <div className="w-full h-1 bg-white/[0.04] rounded-full overflow-hidden">
-                          <div className="h-full bg-brand-500" style={{ width: `${(qualityFactor/25)*100}%` }} />
+                          <div className="h-full bg-brand-500 shadow-[0_0_6px_rgba(38,163,102,0.2)]" style={{ width: `${(qualityFactor/25)*100}%` }} />
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <div className="flex justify-between"><span>Debt</span><span>{debtFactor}/20</span></div>
+                        <div className="flex justify-between"><span>Debt</span><span className="text-white font-bold">{debtFactor}/20</span></div>
                         <div className="w-full h-1 bg-white/[0.04] rounded-full overflow-hidden">
-                          <div className="h-full bg-brand-500" style={{ width: `${(debtFactor/20)*100}%` }} />
+                          <div className="h-full bg-brand-500 shadow-[0_0_6px_rgba(38,163,102,0.2)]" style={{ width: `${(debtFactor/20)*100}%` }} />
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Probabilities Grid */}
+                  {/* Probabilities Grid (Color-graded Boxes) */}
                   <div className="grid grid-cols-4 gap-2 text-center border-t border-white/5 pt-3">
-                    <div className="p-2 bg-black/40 border border-white/5 rounded-xl">
+                    <div className="p-2 bg-emerald-500/[0.01] border border-emerald-500/10 rounded-xl hover:border-emerald-500/20 transition-colors">
                       <div className="text-[9px] text-gray-500 font-semibold uppercase">2X (3Y)</div>
-                      <div className="text-xs font-bold text-gray-200 font-mono mt-1">{item.probabilities?.x2_3y}%</div>
+                      <div className="text-xs font-black text-emerald-400 font-mono mt-1">{item.probabilities?.x2_3y}%</div>
                     </div>
-                    <div className="p-2 bg-black/40 border border-white/5 rounded-xl">
+                    <div className="p-2 bg-green-500/[0.01] border border-green-500/10 rounded-xl hover:border-green-500/20 transition-colors">
                       <div className="text-[9px] text-gray-500 font-semibold uppercase">3X (5Y)</div>
-                      <div className="text-xs font-bold text-gray-200 font-mono mt-1">{item.probabilities?.x3_5y}%</div>
+                      <div className="text-xs font-black text-green-400 font-mono mt-1">{item.probabilities?.x3_5y}%</div>
                     </div>
-                    <div className="p-2 bg-black/40 border border-white/5 rounded-xl">
+                    <div className="p-2 bg-brand-500/[0.01] border border-brand-500/10 rounded-xl hover:border-brand-500/20 transition-colors">
                       <div className="text-[9px] text-gray-500 font-semibold uppercase">5X (10Y)</div>
-                      <div className="text-xs font-bold text-gray-200 font-mono mt-1">{item.probabilities?.x5_10y}%</div>
+                      <div className="text-xs font-black text-brand-400 font-mono mt-1">{item.probabilities?.x5_10y}%</div>
                     </div>
-                    <div className="p-2 bg-black/40 border border-white/5 rounded-xl">
+                    <div className="p-2 bg-amber-500/[0.01] border border-amber-500/10 rounded-xl hover:border-amber-500/20 transition-colors">
                       <div className="text-[9px] text-gray-500 font-semibold uppercase">10X (10Y)</div>
-                      <div className="text-xs font-bold text-gray-200 font-mono mt-1">{item.probabilities?.x10_10y}%</div>
+                      <div className="text-xs font-black text-amber-400 font-mono mt-1">{item.probabilities?.x10_10y}%</div>
                     </div>
                   </div>
                 </div>
