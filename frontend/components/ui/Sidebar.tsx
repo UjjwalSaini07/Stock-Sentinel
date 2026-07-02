@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Eye, Bell, LogOut, TrendingUp, ChevronRight, Search, Bot, Cpu, Globe } from 'lucide-react'
+import { LayoutDashboard, Eye, Bell, LogOut, TrendingUp, ChevronRight, Search, Bot, Cpu, Globe, Sparkles } from 'lucide-react'
 import { useAuthStore } from '@/lib/store'
 import { useState } from 'react'
 import StockSearch from '@/components/stock/StockSearch'
@@ -13,6 +13,7 @@ const NAV = [
   { href: '/alerts', label: 'Alerts', icon: Bell, desc: 'Price notifications' },
   { href: '/copilot', label: 'AI Copilot', icon: Bot, desc: 'AI assistant' },
   { href: '/quant', label: 'Quant Lab', icon: TrendingUp, desc: 'Quantitative research' },
+  { href: '/multibagger-discovery', label: 'Multibagger Discovery', icon: Sparkles, desc: 'Find high-potential stocks' },
   { href: '/architecture', label: 'System Architecture', icon: Cpu, desc: 'Platform blueprint' },
 ]
 

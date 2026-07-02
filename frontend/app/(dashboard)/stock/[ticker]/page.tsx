@@ -4,7 +4,8 @@ import { useParams, useRouter } from 'next/navigation'
 import {
   TrendingUp, TrendingDown, RefreshCw, ArrowLeft,
   Plus, Bell, Bookmark, Info, Activity, Target, ShieldAlert, Eye,
-  Zap, Coins, HelpCircle, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronUp, Scale, Sparkles
+  Zap, Coins, HelpCircle, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronUp, Scale, Sparkles,
+  Compass, Award
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
@@ -439,7 +440,7 @@ export default function StockDetailPage() {
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
-  const [activeTab, setActiveTab] = useState<'fundamentals' | 'forecast' | 'alert' | 'research'>('fundamentals')
+  const [activeTab, setActiveTab] = useState<'fundamentals' | 'forecast' | 'alert' | 'research' | 'playbook'>('fundamentals')
   const [sparkData, setSparkData] = useState<any[]>([])
 
   const [analysis, setAnalysis] = useState<any | null>(null)
@@ -452,6 +453,11 @@ export default function StockDetailPage() {
   const [researchError, setResearchError] = useState('')
   const [expandedAlpha, setExpandedAlpha] = useState(false)
   const [calcInspector, setCalcInspector] = useState<any | null>(null)
+
+  // AI Playbook Decision states
+  const [decisionData, setDecisionData] = useState<any | null>(null)
+  const [loadingDecision, setLoadingDecision] = useState(false)
+  const [decisionError, setDecisionError] = useState('')
 
   const fetchAnalysis = useCallback(async () => {
     try {
@@ -470,12 +476,22 @@ export default function StockDetailPage() {
     try {
       setLoadingResearch(true)
       setResearchError('')
-      const res = await stockApi.getTerminalResearch(ticker)
-      setResearchData(res.data)
+      setLoadingDecision(true)
+      setDecisionError('')
+      
+      const [resResearch, resDecision] = await Promise.all([
+        stockApi.getTerminalResearch(ticker),
+        stockApi.getDecisionIntelligence(ticker)
+      ])
+      
+      setResearchData(resResearch.data)
+      setDecisionData(resDecision.data)
     } catch (err: any) {
       setResearchError(err?.response?.data?.detail || 'Failed to fetch terminal research')
+      setDecisionError(err?.response?.data?.detail || 'Failed to fetch decision intelligence')
     } finally {
       setLoadingResearch(false)
+      setLoadingDecision(false)
     }
   }, [ticker])
 
@@ -483,7 +499,7 @@ export default function StockDetailPage() {
     if (activeTab === 'forecast' && !analysis && !loadingAnalysis) {
       fetchAnalysis()
     }
-    if (activeTab === 'research' && !researchData && !loadingResearch) {
+    if ((activeTab === 'research' || activeTab === 'playbook') && !researchData && !loadingResearch) {
       fetchResearch()
     }
   }, [activeTab, analysis, loadingAnalysis, fetchAnalysis, researchData, loadingResearch, fetchResearch])
@@ -887,7 +903,7 @@ export default function StockDetailPage() {
       {/* Tabs: Fundamentals / Forecast / Research Terminal / Alert */}
       <div className="card">
         <div className="flex flex-wrap gap-1.5 p-1.5 bg-black/60 border border-white/[0.04] rounded-2xl w-fit mb-5 backdrop-blur-md">
-          {(['fundamentals', 'research', 'forecast', 'alert'] as const).map(t => (
+          {(['fundamentals', 'research', 'playbook', 'forecast', 'alert'] as const).map(t => (
             <button
               key={t}
               onClick={() => setActiveTab(t)}
@@ -897,7 +913,7 @@ export default function StockDetailPage() {
                   : 'text-gray-400 hover:text-white hover:bg-white/[0.02] border-transparent'
               }`}
             >
-              {t === 'alert' ? '🔔 Set Alert' : t === 'forecast' ? '🔮 AI Forecast' : t === 'research' ? '🏛️ Research Terminal' : '📊 Fundamentals'}
+              {t === 'alert' ? '🔔 Set Alert' : t === 'forecast' ? '🔮 AI Forecast' : t === 'playbook' ? '🚀 AI Playbook' : t === 'research' ? '🏛️ Research Terminal' : '📊 Fundamentals'}
             </button>
           ))}
         </div>
@@ -1575,6 +1591,423 @@ export default function StockDetailPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          )
+        ) : activeTab === 'playbook' ? (
+          loadingDecision || !decisionData ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <RefreshCw className="animate-spin text-brand-400" size={28} />
+              <p className="text-gray-500 text-sm">Evaluating decision intelligence layers, running risk simulations, pricing entry zones...</p>
+            </div>
+          ) : decisionError ? (
+            <div className="text-center py-10 space-y-4">
+              <p className="text-red-400 text-sm">{decisionError}</p>
+              <button onClick={fetchResearch} className="btn-outline text-xs flex items-center gap-1.5 mx-auto">
+                <RefreshCw size={12} /> Retry Load
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-6 animate-fade-in text-gray-200">
+              {/* Playbook Header Summary Banner */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-5 rounded-2xl bg-white/[0.01] border border-white/5">
+                <div className="p-4 rounded-xl bg-black/40 border border-white/5 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-[80px] h-[80px] bg-brand-500/[0.02] blur-xl rounded-full" />
+                  <div className="text-[10px] text-gray-500 uppercase font-semibold">AI Conviction Meter</div>
+                  <div className="text-xl font-black text-white mt-1.5 flex items-center gap-2">
+                    <Sparkles size={16} className="text-brand-400" />
+                    {decisionData.conviction_meter}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1 leading-normal">Agreement consensus across fundamentals, valuations, and technical timing filters.</p>
+                </div>
+                
+                <div className="p-4 rounded-xl bg-black/40 border border-white/5 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-[80px] h-[80px] bg-brand-500/[0.02] blur-xl rounded-full" />
+                  <div className="text-[10px] text-gray-500 uppercase font-semibold">AI Daily Health Index</div>
+                  <div className="text-xl font-black text-brand-400 font-mono mt-1.5">
+                    {decisionData.health_score} / 100
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1 leading-normal">Aggregate daily score computed from momentum trend, valuation discount, and FII/DII activities.</p>
+                </div>
+
+                <div className="p-4 rounded-xl bg-black/40 border border-white/5 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 w-[80px] h-[80px] bg-brand-500/[0.02] blur-xl rounded-full" />
+                  <div className="text-[10px] text-gray-500 uppercase font-semibold">AI Peer DNA Match</div>
+                  <div className="text-xl font-black text-white mt-1.5 flex items-center gap-2">
+                    <Activity size={16} className="text-brand-400" />
+                    {decisionData.stock_dna} Style
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1 leading-normal">Matches this stock's margin efficiency, growth runway, and asset ratios to leading market leaders.</p>
+                </div>
+              </div>
+
+              {/* Core Playbook 3-column Layout */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* AI Entry Zone Card */}
+                <div className="card space-y-4">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
+                    <Target size={14} /> AI Entry Zone Engine
+                  </h4>
+                  
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-baseline border-b border-white/5 pb-2">
+                      <span className="text-gray-400 text-xs">Current Price</span>
+                      <span className="text-base font-bold font-mono text-white">₹{decisionData.entry_zone.current_price?.toLocaleString('en-IN')}</span>
+                    </div>
+
+                    <div className="flex justify-between items-baseline border-b border-white/5 pb-2">
+                      <span className="text-gray-400 text-xs">Best Entry Target</span>
+                      <span className="text-base font-bold font-mono text-brand-400">₹{decisionData.entry_zone.best_entry?.toLocaleString('en-IN')}</span>
+                    </div>
+
+                    <div className="flex justify-between items-baseline border-b border-white/5 pb-2">
+                      <span className="text-gray-400 text-xs">Suggested SIP Range</span>
+                      <span className="text-xs font-bold font-mono text-white">
+                        ₹{decisionData.entry_zone.sip_range[0]?.toLocaleString('en-IN')} - ₹{decisionData.entry_zone.sip_range[1]?.toLocaleString('en-IN')}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-[10px]">
+                        <span className="text-gray-500 font-semibold uppercase">Good Entry Probability</span>
+                        <span className="text-brand-400 font-bold font-mono">{decisionData.entry_zone.probability}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-brand-500" 
+                          style={{ width: `${decisionData.entry_zone.probability}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-black/40 border border-white/5 rounded-xl space-y-1 text-xs">
+                    <div className="text-[10px] text-gray-500 font-bold uppercase">Pricing Zones</div>
+                    <div className="grid grid-cols-2 gap-2 font-mono text-[10px] mt-1.5">
+                      <div className="p-1.5 bg-white/[0.02] border border-white/5 rounded text-center">
+                        <div className="text-gray-500">Safe Buy</div>
+                        <div className="text-gray-300 mt-0.5">₹{decisionData.entry_zone.strong_support[0]} - ₹{decisionData.entry_zone.strong_support[1]}</div>
+                      </div>
+                      <div className="p-1.5 bg-white/[0.02] border border-white/5 rounded text-center">
+                        <div className="text-gray-500">Deep Value</div>
+                        <div className="text-gray-300 mt-0.5">₹{decisionData.entry_zone.historical_demand[0]} - ₹{decisionData.entry_zone.historical_demand[1]}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* AI Exit Engine Card */}
+                <div className="card space-y-4">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
+                    <TrendingUp size={14} /> AI Exit & Target Engine
+                  </h4>
+
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                      <div>
+                        <div className="text-xs font-bold text-white">Target 1 (Short Term)</div>
+                        <div className="text-[10px] text-gray-500 mt-0.5">Probability: {decisionData.exit_engine.target_1_prob}%</div>
+                      </div>
+                      <span className="text-sm font-bold font-mono text-brand-400">₹{decisionData.exit_engine.target_1?.toLocaleString('en-IN')}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                      <div>
+                        <div className="text-xs font-bold text-white">Target 2 (Swing)</div>
+                        <div className="text-[10px] text-gray-500 mt-0.5">Probability: {decisionData.exit_engine.target_2_prob}%</div>
+                      </div>
+                      <span className="text-sm font-bold font-mono text-brand-400">₹{decisionData.exit_engine.target_2?.toLocaleString('en-IN')}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                      <div>
+                        <div className="text-xs font-bold text-white">Target 3 (Long Term)</div>
+                        <div className="text-[10px] text-gray-500 mt-0.5">Probability: {decisionData.exit_engine.target_3_prob}%</div>
+                      </div>
+                      <span className="text-sm font-bold font-mono text-brand-400">₹{decisionData.exit_engine.target_3?.toLocaleString('en-IN')}</span>
+                    </div>
+
+                    <div className="flex justify-between items-baseline pt-1">
+                      <span className="text-gray-400 text-xs">Hard Stop Loss</span>
+                      <span className="text-sm font-bold font-mono text-red-400">₹{decisionData.exit_engine.stop_loss?.toLocaleString('en-IN')}</span>
+                    </div>
+                    
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-gray-400 text-xs">Trailing Stop Loss</span>
+                      <span className="text-xs font-bold font-mono text-gray-300">₹{decisionData.exit_engine.trailing_stop?.toLocaleString('en-IN')}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Smart Entry Timer Card */}
+                <div className="card space-y-4">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
+                    <Activity size={14} /> Smart Timing & Catalysts
+                  </h4>
+
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-xl bg-black/40 border border-white/5 text-center space-y-1">
+                      <div className="text-[10px] text-gray-500 font-bold uppercase">Timing Signal</div>
+                      <div className={`text-xl font-black ${
+                        decisionData.smart_entry_timer.signal === 'Buy Now' ? 'text-brand-400' :
+                        decisionData.smart_entry_timer.signal === 'Accumulate Slowly' ? 'text-blue-400' : 'text-red-400'
+                      }`}>
+                        {decisionData.smart_entry_timer.signal}
+                      </div>
+                      <p className="text-[10px] text-gray-400 leading-normal pt-1.5 text-left border-t border-white/5 mt-1.5">
+                        {decisionData.smart_entry_timer.reasoning}
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="text-[10px] text-gray-500 font-semibold uppercase">Holding Period Estimator</div>
+                      <div className="p-3 bg-white/[0.02] border border-white/5 rounded-xl text-xs space-y-1">
+                        <div className="font-bold text-white">{decisionData.holding_period.period}</div>
+                        <p className="text-gray-400 leading-relaxed text-[11px]">{decisionData.holding_period.reasoning}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Multibagger Probability & Scenarios */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* Multibagger Probability Engine */}
+                <div className="card space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
+                      <Sparkles size={14} /> Multibagger Probability Engine
+                    </h4>
+                    <span className="badge-blue text-[10px] font-mono">Confidence: {decisionData.multibagger_probability.confidence}</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 border-b border-white/5 pb-4">
+                    <div className="p-3 bg-black/40 border border-white/5 rounded-xl text-center space-y-1">
+                      <div className="text-[10px] text-gray-500 uppercase font-semibold">Multibagger Potential Score</div>
+                      <div className="text-2xl font-black text-brand-400 font-mono">{decisionData.multibagger_probability.score} %</div>
+                    </div>
+                    <div className="p-3 bg-black/40 border border-white/5 rounded-xl text-center space-y-1">
+                      <div className="text-[10px] text-gray-500 uppercase font-semibold">Growth Required CAGR</div>
+                      <div className="text-2xl font-black text-white font-mono">{decisionData.multibagger_probability.required_cagr_10x}%</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3.5 text-xs">
+                    <div className="space-y-1">
+                      <div className="flex justify-between font-mono text-[10px]">
+                        <span className="text-gray-400">2X Return Probability (3 Years)</span>
+                        <span className="text-white font-bold">{decisionData.multibagger_probability.probabilities.x2_3y}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+                        <div className="h-full bg-brand-500" style={{ width: `${decisionData.multibagger_probability.probabilities.x2_3y}%` }} />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between font-mono text-[10px]">
+                        <span className="text-gray-400">3X Return Probability (5 Years)</span>
+                        <span className="text-white font-bold">{decisionData.multibagger_probability.probabilities.x3_5y}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+                        <div className="h-full bg-brand-500" style={{ width: `${decisionData.multibagger_probability.probabilities.x3_5y}%` }} />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between font-mono text-[10px]">
+                        <span className="text-gray-400">5X Return Probability (10 Years)</span>
+                        <span className="text-white font-bold">{decisionData.multibagger_probability.probabilities.x5_10y}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+                        <div className="h-full bg-brand-500" style={{ width: `${decisionData.multibagger_probability.probabilities.x5_10y}%` }} />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between font-mono text-[10px]">
+                        <span className="text-gray-400">10X Return Probability (10 Years)</span>
+                        <span className="text-white font-bold">{decisionData.multibagger_probability.probabilities.x10_10y}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-white/[0.04] rounded-full overflow-hidden">
+                        <div className="h-full bg-brand-500" style={{ width: `${decisionData.multibagger_probability.probabilities.x10_10y}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* AI Future Scenarios */}
+                <div className="card space-y-4">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
+                    <TrendingUp size={14} /> AI Future Value Projections
+                  </h4>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead>
+                        <tr className="border-b border-white/5 text-gray-500 uppercase font-bold text-[10px] tracking-wider">
+                          <th className="py-2.5">Scenario</th>
+                          <th className="py-2.5">Target Price</th>
+                          <th className="py-2.5">Expected CAGR</th>
+                          <th className="py-2.5">Probability</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 font-mono text-gray-200">
+                        <tr>
+                          <td className="py-3 text-brand-400 font-sans">Bull Case Scenario</td>
+                          <td className="py-3">₹{decisionData.scenarios.bull.price}</td>
+                          <td className="py-3">+{decisionData.scenarios.bull.cagr}%</td>
+                          <td className="py-3">{decisionData.scenarios.bull.probability}%</td>
+                        </tr>
+                        <tr>
+                          <td className="py-3 text-white font-sans">Base Case Scenario</td>
+                          <td className="py-3">₹{decisionData.scenarios.base.price}</td>
+                          <td className="py-3">+{decisionData.scenarios.base.cagr}%</td>
+                          <td className="py-3">{decisionData.scenarios.base.probability}%</td>
+                        </tr>
+                        <tr>
+                          <td className="py-3 text-red-400 font-sans">Bear Case Scenario</td>
+                          <td className="py-3">₹{decisionData.scenarios.bear.price}</td>
+                          <td className="py-3">-{Math.abs(decisionData.scenarios.bear.cagr)}%</td>
+                          <td className="py-3">{decisionData.scenarios.bear.probability}%</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Catalysts, Why Today & AI Risks Simulation */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* Catalysts & Daily Moves */}
+                <div className="card space-y-4">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
+                    <Info size={14} /> Future Catalysts & Daily Catalyst
+                  </h4>
+
+                  <div className="p-3 bg-brand-500/[0.01] border border-brand-500/5 rounded-xl text-xs space-y-1">
+                    <div className="text-[10px] text-brand-400 font-bold uppercase flex items-center gap-1.5">
+                      <Zap size={11} /> Today's AI Catalyst Breakdown
+                    </div>
+                    <p className="text-gray-300 leading-relaxed font-sans mt-1">{decisionData.why_today}</p>
+                  </div>
+
+                  <div className="space-y-2.5">
+                    <div className="text-[10px] text-gray-500 font-bold uppercase">Expected Future Catalysts</div>
+                    {decisionData.catalysts.map((c: any, i: number) => (
+                      <div key={i} className="flex justify-between items-start p-2.5 bg-white/[0.02] border border-white/5 rounded-xl text-xs">
+                        <div>
+                          <div className="font-bold text-white">{c.event}</div>
+                          <div className="text-[10px] text-gray-500 mt-0.5">{c.detail}</div>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono ${
+                          c.impact === 'Positive' ? 'bg-brand-500/10 text-brand-400 border border-brand-500/20' :
+                          c.impact === 'Negative' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-white/5 text-gray-400'
+                        }`}>
+                          {c.impact} Impact
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* AI Risk Simulation */}
+                <div className="card space-y-4">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
+                    <ShieldAlert size={14} /> AI Risk Simulation Map
+                  </h4>
+
+                  <div className="space-y-3">
+                    {decisionData.risks.map((r: any) => (
+                      <div key={r.name} className="p-3 bg-white/[0.02] border border-white/5 rounded-xl space-y-2">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-bold text-white">{r.name}</span>
+                          <span className="text-[10px] text-gray-500 font-mono">
+                            Prob: <strong className="text-red-400">{r.prob}%</strong> · Impact: <strong className="text-red-400">{r.impact}/100</strong>
+                          </span>
+                        </div>
+                        <div className="w-full h-1 bg-white/[0.03] rounded-full overflow-hidden">
+                          <div className="h-full bg-red-500" style={{ width: `${r.prob}%` }} />
+                        </div>
+                        <p className="text-[10px] text-gray-400 font-sans leading-normal">
+                          <strong className="text-gray-500">Mitigation:</strong> {r.mitigation}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Portfolio Fit & Institutional Playbook */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* AI Portfolio Suitability */}
+                <div className="card space-y-4">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
+                    <Compass size={14} /> AI Portfolio Fit Suitability
+                  </h4>
+
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    {Object.entries(decisionData.portfolio_fit).map(([persona, fit]: any) => (
+                      <div key={persona} className="p-3 bg-black/40 border border-white/5 rounded-xl space-y-2">
+                        <div className="flex justify-between items-baseline font-mono text-[10px]">
+                          <span className="text-gray-400 font-sans">{persona}</span>
+                          <span className={`${fit > 65 ? 'text-brand-400' : 'text-gray-300'} font-bold`}>{fit}%</span>
+                        </div>
+                        <div className="w-full h-1 bg-white/[0.03] rounded-full overflow-hidden">
+                          <div className={`h-full ${fit > 65 ? 'bg-brand-500' : 'bg-gray-500'}`} style={{ width: `${fit}%` }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* The Investment Playbook */}
+                <div className="card space-y-4 border-t-4 border-brand-500">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-brand-400 flex items-center gap-1.5">
+                    <Award size={14} /> The Institutional Investment Playbook
+                  </h4>
+
+                  <div className="space-y-3.5 text-xs leading-normal">
+                    <div className="p-3 bg-brand-500/[0.01] border border-brand-500/5 rounded-xl">
+                      <div className="text-[10px] text-brand-400 font-bold uppercase">Investment Thesis</div>
+                      <p className="text-gray-300 leading-relaxed font-sans mt-1">{decisionData.playbook.thesis}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-center font-mono text-[10px]">
+                      <div className="p-2 bg-white/[0.02] border border-white/5 rounded-xl">
+                        <div className="text-gray-500">Ideal Buy Trigger</div>
+                        <div className="text-brand-400 font-bold mt-0.5">{decisionData.playbook.buy_zone}</div>
+                      </div>
+                      <div className="p-2 bg-white/[0.02] border border-white/5 rounded-xl">
+                        <div className="text-gray-500">Ideal Exit Trigger</div>
+                        <div className="text-brand-400 font-bold mt-0.5">{decisionData.playbook.exit_zone}</div>
+                      </div>
+                    </div>
+
+                    <div className="border-t border-white/5 pt-3.5 grid grid-cols-3 gap-2 text-center text-xs font-mono">
+                      <div>
+                        <div className="text-[9px] text-gray-500 uppercase font-semibold">Expected CAGR</div>
+                        <div className="text-white font-bold mt-0.5">+{decisionData.playbook.expected_cagr}%</div>
+                      </div>
+                      <div>
+                        <div className="text-[9px] text-gray-500 uppercase font-semibold">Expected Upside</div>
+                        <div className="text-white font-bold mt-0.5">+{decisionData.playbook.expected_return}%</div>
+                      </div>
+                      <div>
+                        <div className="text-[9px] text-gray-500 uppercase font-semibold">Success Prob</div>
+                        <div className="text-brand-400 font-bold mt-0.5">{decisionData.playbook.probability_success}%</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
             </div>
           )
         ) : (
