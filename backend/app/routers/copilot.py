@@ -26,6 +26,10 @@ import re
 
 router = APIRouter()
 
+from app.services.portfolio_intelligence_v2 import calculate_portfolio_intelligence_v2
+from app.services.portfolio_decision_layer import generate_portfolio_decision_layer, calculate_sip_wealth_projection
+from app.services.market_intelligence import generate_market_intelligence
+
 # ── Pydantic Request Models ──────────────────────────────────
 
 class ChatRequest(BaseModel):
@@ -41,6 +45,14 @@ class WhatIfRequest(BaseModel):
 
 class ScreenerRequest(BaseModel):
     screener_type: str
+
+
+class WealthPlannerRequest(BaseModel):
+    sip: float = 0.0
+    lump_sum: float = 0.0
+    horizon: int = 5
+    risk_appetite: str = "moderate"
+    inflation: float = 6.0
 
 
 # ── Chat Session Routes ──────────────────────────────────────
@@ -314,3 +326,48 @@ async def get_portfolio_ai_insights(user=Depends(get_current_user)):
 async def get_invest_assistant(ticker: str, user=Depends(get_current_user)):
     assistant = await run_investment_assistant(ticker.upper())
     return assistant
+
+
+@router.get("/portfolio-v2")
+async def get_portfolio_v2(goal: str = "wealth", user=Depends(get_current_user)):
+    portfolio_positions = await get_portfolio_with_prices(user.get("portfolio", []))
+    analysis = calculate_portfolio_intelligence_v2(portfolio_positions, goal)
+    return analysis
+
+
+@router.get("/portfolio/decision-layer")
+async def get_decision_layer(user=Depends(get_current_user)):
+    portfolio = user.get("portfolio", [])
+    db = get_db()
+    watchlist = []
+    watchlist_doc = await db.users.find_one({"_id": user["_id"]}, {"watchlist": 1})
+    if watchlist_doc and "watchlist" in watchlist_doc:
+        watchlist = watchlist_doc["watchlist"]
+        
+    decision_data = generate_portfolio_decision_layer(portfolio, watchlist, "wealth")
+    return decision_data
+
+
+@router.get("/portfolio/market-intelligence")
+async def get_market_intelligence_route(user=Depends(get_current_user)):
+    portfolio_positions = await get_portfolio_with_prices(user.get("portfolio", []))
+    db = get_db()
+    watchlist = []
+    watchlist_doc = await db.users.find_one({"_id": user["_id"]}, {"watchlist": 1})
+    if watchlist_doc and "watchlist" in watchlist_doc:
+        watchlist = watchlist_doc["watchlist"]
+        
+    market_data = await generate_market_intelligence(portfolio_positions, watchlist)
+    return market_data
+
+
+@router.post("/portfolio/wealth-planner")
+async def simulate_wealth(body: WealthPlannerRequest, user=Depends(get_current_user)):
+    projection = calculate_sip_wealth_projection(
+        body.sip,
+        body.lump_sum,
+        body.horizon,
+        body.risk_appetite,
+        body.inflation
+    )
+    return projection
