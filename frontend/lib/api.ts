@@ -71,6 +71,11 @@ export const stockApi = {
   getNews: (tickers?: string) => api.get(`/stock/market/news${tickers ? '?tickers=' + tickers : ''}`),
   getAnalysis: (ticker: string) => api.get(`/stock/${ticker}/analysis`),
   getTerminalResearch: (ticker: string) => api.get(`/stock/${ticker}/terminal-research`),
+  getDecisionIntelligence: (ticker: string) => api.get(`/stock/${ticker}/decision-intelligence`),
+  getScanMultibagger: () => api.get('/stock/scan/multibagger'),
+  getScanEarlyOpportunity: () => api.get('/stock/scan/early-opportunity'),
+  getScanTurnaround: () => api.get('/stock/scan/turnaround'),
+  rankWatchlist: (tickers: string[]) => api.post('/stock/watchlist/rank', { tickers }),
 }
 
 // Alerts
