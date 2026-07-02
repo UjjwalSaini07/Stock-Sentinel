@@ -15,6 +15,20 @@ async def compute_decision_intelligence(ticker: str) -> Dict[str, Any]:
     redis = get_redis()
     db = get_db()
     
+    # Self-healing check: Ensure ticker exists in the main stocks collection
+    if db is not None:
+        stock_exists = await db.stocks.find_one({"ticker": ticker})
+        if not stock_exists:
+            logger.info(f"Ticker {ticker} is missing from stocks collection. Scraping and saving...")
+            from app.services.scraper_service import scrape_extended_stock_data
+            try:
+                await scrape_extended_stock_data(ticker)
+                # Clear terminal research cache for this ticker to force fresh calculations
+                if redis:
+                    await redis.delete(f"terminal_research:{ticker}")
+            except Exception as e:
+                logger.error(f"Failed to scrape missing ticker {ticker} in healing step: {e}")
+    
     cache_key = f"decision_intelligence:{ticker}"
     cached = await redis.get(cache_key) if redis else None
     if cached:
@@ -463,6 +477,11 @@ async def compute_decision_intelligence(ticker: str) -> Dict[str, Any]:
     if redis:
         try:
             await redis.setex(cache_key, 7200, json.dumps(decision_data))
+            # Invalidate scanner caches so they pick up this new/refreshed stock
+            await redis.delete("scan:multibagger")
+            await redis.delete("scan:early-opportunity")
+            await redis.delete("scan:turnaround")
+            logger.info("Invalidated scanner cache keys in Redis for new ticker ingestion")
         except Exception as e:
             logger.error(f"Error caching Decision Intelligence for {ticker} in Redis: {e}")
 

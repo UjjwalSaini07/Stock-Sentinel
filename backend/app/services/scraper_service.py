@@ -492,5 +492,44 @@ async def scrape_extended_stock_data(ticker: str, exchange: str = "NSE") -> dict
     yoy = await get_yoy_change(ticker)
     result["yoy_change_pct"] = yoy
 
+    # Save to MongoDB stocks collection so scanner finds it
+    db = get_db()
+    if db is not None:
+        try:
+            db_data = {
+                "ticker": ticker,
+                "exchange": exchange,
+                "current_price": result["current_price"],
+                "previous_close": result["previous_close"],
+                "market_cap": result["fundamentals"].get("market_cap"),
+                "high": result["fundamentals"].get("high"),
+                "low": result["fundamentals"].get("low"),
+                "stock_pe": result["fundamentals"].get("pe"),
+                "dividend_yield": result["fundamentals"].get("dividend_yield"),
+                "roce": result["fundamentals"].get("roce"),
+                "roe": result["fundamentals"].get("roe"),
+                "face_value": result["fundamentals"].get("face_value"),
+                "sector": result.get("sector"),
+                "industry": result.get("industry"),
+                "quarterly_results": result.get("quarterly_results"),
+                "profit_loss": result.get("profit_loss"),
+                "shareholding_pattern": result.get("shareholding_pattern"),
+                "balance_sheet": result.get("balance_sheet"),
+                "cash_flow": result.get("cash_flow"),
+                "pros": result.get("pros"),
+                "cons": result.get("cons"),
+                "warnings": result.get("warnings"),
+                "yoy_change_pct": result.get("yoy_change_pct"),
+                "last_updated": datetime.now(timezone.utc)
+            }
+            await db.stocks.update_one(
+                {"ticker": ticker},
+                {"$set": db_data},
+                upsert=True
+            )
+            logger.info(f"[Scraper] Saved extended stock data for {ticker} to stocks collection")
+        except Exception as e:
+            logger.error(f"[Scraper] Error saving extended stock data to stocks collection: {e}")
+
     return result
 

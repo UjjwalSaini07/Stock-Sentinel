@@ -59,6 +59,31 @@ async def get_stock(ticker: str):
         raise HTTPException(status_code=404, detail=f"Stock '{ticker}' not found. Make sure the scraper has fetched it.")
     return stock
 
+@router.delete("/{ticker}")
+async def delete_stock_data(ticker: str):
+    from app.database import get_db, get_redis
+    db = get_db()
+    redis = get_redis()
+    ticker_upper = ticker.upper()
+    if db is not None:
+        try:
+            # Delete from stocks collection
+            await db.stocks.delete_one({"ticker": ticker_upper})
+            # Delete from decision_intelligence collection
+            await db.decision_intelligence.delete_one({"ticker": ticker_upper})
+            # Invalidate Redis caches
+            if redis:
+                await redis.delete(f"stock:{ticker_upper}")
+                await redis.delete(f"decision_intelligence:{ticker_upper}")
+                await redis.delete(f"terminal_research:{ticker_upper}")
+                await redis.delete("scan:multibagger")
+                await redis.delete("scan:early-opportunity")
+                await redis.delete("scan:turnaround")
+            return {"status": "success", "message": f"Stock {ticker_upper} deleted successfully"}
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to delete stock {ticker_upper}: {str(e)}")
+    raise HTTPException(status_code=500, detail="Database connection not available")
+
 @router.get("/{ticker}/analysis")
 async def get_analysis(ticker: str):
     from app.services.analysis_service import get_stock_analysis
