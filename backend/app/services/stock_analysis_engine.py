@@ -186,7 +186,7 @@ async def compute_terminal_research(ticker: str) -> Dict[str, Any]:
     db = get_db()
     
     cache_key = f"terminal_research:{ticker}"
-    cached = await redis.get(cache_key)
+    cached = await redis.get(cache_key) if redis else None
     if cached:
         logger.info(f"Returning cached Terminal Research for {ticker} from Redis")
         return json.loads(cached)
@@ -1123,7 +1123,8 @@ async def compute_terminal_research(ticker: str) -> Dict[str, Any]:
     
     # Save/Cache in MongoDB & Redis
     try:
-        await redis.setex(cache_key, 7200, json.dumps(terminal_data))
+        if redis:
+            await redis.setex(cache_key, 7200, json.dumps(terminal_data))
         if db is not None:
             db_save = {**terminal_data}
             db_save["ticker"] = ticker
