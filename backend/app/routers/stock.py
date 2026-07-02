@@ -266,4 +266,96 @@ async def get_market_news(tickers: str = Query(None)):
     return articles[:12]
 
 
+@router.get("/{ticker}/terminal-research")
+async def get_terminal_research(ticker: str):
+    from app.services.stock_analysis_engine import compute_terminal_research
+    try:
+        data = await compute_terminal_research(ticker.upper())
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{ticker}/alpha-score")
+async def get_alpha_score(ticker: str):
+    from app.services.stock_analysis_engine import compute_terminal_research
+    try:
+        data = await compute_terminal_research(ticker.upper())
+        return {
+            "ticker": ticker.upper(),
+            "raw_data": data["alpha_score"],
+            "explanation": data["alpha_score"]["explanation"],
+            "timestamp": data["timestamp"],
+            "confidence": data["alpha_score"]["confidence"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{ticker}/fundamental-score")
+async def get_fundamental_score(ticker: str):
+    from app.services.stock_analysis_engine import compute_terminal_research
+    try:
+        data = await compute_terminal_research(ticker.upper())
+        return {
+            "ticker": ticker.upper(),
+            "score": data["piotroski_score"]["score"],
+            "explanation": "Piotroski F-score measuring profitability, leverage and operational efficiency.",
+            "timestamp": data["timestamp"],
+            "raw_data": data["piotroski_score"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{ticker}/technical-score")
+async def get_technical_score(ticker: str):
+    from app.services.stock_analysis_engine import compute_terminal_research
+    try:
+        data = await compute_terminal_research(ticker.upper())
+        return {
+            "ticker": ticker.upper(),
+            "score": data["technical_timing"]["score"],
+            "explanation": "Technical Indicators Trend score aggregate.",
+            "timestamp": data["timestamp"],
+            "raw_data": data["technical_timing"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{ticker}/risk-score")
+async def get_risk_score(ticker: str):
+    from app.services.stock_analysis_engine import compute_terminal_research
+    try:
+        data = await compute_terminal_research(ticker.upper())
+        return {
+            "ticker": ticker.upper(),
+            "score": data["risk_analysis"]["score"],
+            "explanation": "Corporate financial, liquidity, debt, and volatility risk aggregate.",
+            "timestamp": data["timestamp"],
+            "raw_data": data["risk_analysis"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{ticker}/intrinsic-value")
+async def get_intrinsic_value(ticker: str):
+    from app.services.stock_analysis_engine import compute_terminal_research
+    try:
+        data = await compute_terminal_research(ticker.upper())
+        return {
+            "ticker": ticker.upper(),
+            "intrinsic_value": data["intrinsic_value"]["value"],
+            "current_price": data["intrinsic_value"]["current_price"],
+            "discount_pct": data["intrinsic_value"]["discount_pct"],
+            "margin_of_safety": data["intrinsic_value"]["margin_of_safety"],
+            "timestamp": data["timestamp"],
+            "raw_data": data["intrinsic_value"]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 

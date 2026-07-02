@@ -70,6 +70,7 @@ export const stockApi = {
   getIndices: () => api.get('/stock/market/indices'),
   getNews: (tickers?: string) => api.get(`/stock/market/news${tickers ? '?tickers=' + tickers : ''}`),
   getAnalysis: (ticker: string) => api.get(`/stock/${ticker}/analysis`),
+  getTerminalResearch: (ticker: string) => api.get(`/stock/${ticker}/terminal-research`),
 }
 
 // Alerts

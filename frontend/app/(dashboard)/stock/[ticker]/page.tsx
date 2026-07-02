@@ -3,7 +3,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import {
   TrendingUp, TrendingDown, RefreshCw, ArrowLeft,
-  Plus, Bell, Bookmark, Info, Activity, BadgeDollarSign, Target, ShieldAlert, Eye
+  Plus, Bell, Bookmark, Info, Activity, Target, ShieldAlert, Eye,
+  Zap, Coins, HelpCircle, CheckCircle2, XCircle, AlertTriangle, ChevronDown, ChevronUp, Scale, Sparkles
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import {
@@ -438,12 +439,19 @@ export default function StockDetailPage() {
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
-  const [activeTab, setActiveTab] = useState<'fundamentals' | 'forecast' | 'alert'>('fundamentals')
+  const [activeTab, setActiveTab] = useState<'fundamentals' | 'forecast' | 'alert' | 'research'>('fundamentals')
   const [sparkData, setSparkData] = useState<any[]>([])
 
   const [analysis, setAnalysis] = useState<any | null>(null)
   const [loadingAnalysis, setLoadingAnalysis] = useState(false)
   const [analysisError, setAnalysisError] = useState('')
+
+  // Terminal Research states
+  const [researchData, setResearchData] = useState<any | null>(null)
+  const [loadingResearch, setLoadingResearch] = useState(false)
+  const [researchError, setResearchError] = useState('')
+  const [expandedAlpha, setExpandedAlpha] = useState(false)
+  const [calcInspector, setCalcInspector] = useState<any | null>(null)
 
   const fetchAnalysis = useCallback(async () => {
     try {
@@ -458,11 +466,27 @@ export default function StockDetailPage() {
     }
   }, [ticker])
 
+  const fetchResearch = useCallback(async () => {
+    try {
+      setLoadingResearch(true)
+      setResearchError('')
+      const res = await stockApi.getTerminalResearch(ticker)
+      setResearchData(res.data)
+    } catch (err: any) {
+      setResearchError(err?.response?.data?.detail || 'Failed to fetch terminal research')
+    } finally {
+      setLoadingResearch(false)
+    }
+  }, [ticker])
+
   useEffect(() => {
     if (activeTab === 'forecast' && !analysis && !loadingAnalysis) {
       fetchAnalysis()
     }
-  }, [activeTab, analysis, loadingAnalysis, fetchAnalysis])
+    if (activeTab === 'research' && !researchData && !loadingResearch) {
+      fetchResearch()
+    }
+  }, [activeTab, analysis, loadingAnalysis, fetchAnalysis, researchData, loadingResearch, fetchResearch])
 
   const holding = user?.portfolio?.find(p => p.ticker === ticker?.toUpperCase())
   const isWatched = user?.watchlist?.includes(ticker?.toUpperCase())
@@ -509,13 +533,14 @@ export default function StockDetailPage() {
 
   useEffect(() => {
     fetchStock()
+    fetchResearch() // pre-load research calculations on mount
     const interval = setInterval(fetchStock, 30000)
     return () => clearInterval(interval)
-  }, [fetchStock])
+  }, [fetchStock, fetchResearch])
 
   async function handleRefresh() {
     setRefreshing(true)
-    await fetchStock()
+    await Promise.all([fetchStock(), fetchResearch()])
     setRefreshing(false)
   }
 
@@ -559,7 +584,7 @@ export default function StockDetailPage() {
   const sparkMax = maxPrice + pad
 
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-5 animate-fade-in text-gray-200">
       {/* Breadcrumb */}
       <button onClick={() => router.back()} className="flex items-center gap-1.5 text-gray-500 hover:text-white transition-colors text-sm">
         <ArrowLeft size={15} /> Back
@@ -574,7 +599,7 @@ export default function StockDetailPage() {
           <div className="flex items-start justify-between mb-4">
             <div>
               <div className="flex items-center gap-3 mb-1">
-                <h1 className="text-3xl font-bold tracking-tight">{stock.ticker}</h1>
+                <h1 className="text-3xl font-bold tracking-tight text-white">{stock.ticker}</h1>
                 <span className="badge-gray">{stock.exchange}</span>
                 {holding && <span className="badge-blue">In Portfolio</span>}
                 {stock.from_cache && <span className="badge-amber flex items-center gap-1"><Activity size={9} /> Cached</span>}
@@ -607,7 +632,7 @@ export default function StockDetailPage() {
 
           {/* Price block */}
           <div className="flex items-baseline gap-4">
-            <span className="text-4xl font-bold font-mono tracking-tight">
+            <span className="text-4xl font-bold font-mono tracking-tight text-white">
               {stock.current_price ? `₹${stock.current_price.toLocaleString('en-IN')}` : '—'}
             </span>
             {change !== null && (
@@ -629,7 +654,7 @@ export default function StockDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Chart */}
         <div className="card md:col-span-2">
-          <h3 className="section-title mb-4"><Activity size={14} /> Intraday Movement</h3>
+          <h3 className="section-title mb-4 text-white"><Activity size={14} /> Intraday Movement</h3>
           {sparkData.length > 0 ? (
             <ResponsiveContainer width="100%" height={160}>
               <AreaChart data={sparkData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
@@ -659,7 +684,7 @@ export default function StockDetailPage() {
         <div className="space-y-4">
           {holding ? (
             <div className="card h-full">
-              <h3 className="section-title mb-3">Your Holdings</h3>
+              <h3 className="section-title mb-3 text-white">Your Holdings</h3>
               <div className={`text-2xl font-bold font-mono mb-1 ${(holding.pnl ?? 0) >= 0 ? 'text-brand-400' : 'text-red-400'}`}>
                 {(holding.pnl ?? 0) >= 0 ? '+' : ''}₹{Math.abs(holding.pnl ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
               </div>
@@ -706,7 +731,7 @@ export default function StockDetailPage() {
       {stock.high && stock.low && stock.current_price && (
         <div className="card">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="section-title"><Bookmark size={14} /> 52-Week Range</h3>
+            <h3 className="section-title text-white"><Bookmark size={14} /> 52-Week Range</h3>
             {stock.analytics?.range_position && (
               <span className="text-xs text-gray-400 font-mono">
                 Current is at the <strong className="text-white">{stock.analytics.range_position.percentile}%</strong> percentile
@@ -744,7 +769,7 @@ export default function StockDetailPage() {
       {/* Qualitative Analytics Health Breakdown */}
       {stock.analytics && (
         <div className="card">
-          <h3 className="section-title mb-4"><Info size={14} /> Fundamental Breakdown & Health Check</h3>
+          <h3 className="section-title mb-4 text-white"><Info size={14} /> Fundamental Breakdown & Health Check</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Valuation Card */}
             {stock.analytics.valuation && (
@@ -789,10 +814,80 @@ export default function StockDetailPage() {
         </div>
       )}
 
-      {/* Tabs: Fundamentals / Forecast / Alert */}
+      {/* NEW MODULE 1 & 2: PREMIUM AI ALPHA SCORE & COMPOSITE BANNER */}
+      {researchData && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Alpha Score Banner Card */}
+          <div className="card flex flex-col justify-between border-brand-500/15 hover:border-brand-500/30 transition-all duration-300 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-brand-500/5 rounded-full blur-2xl pointer-events-none group-hover:bg-brand-500/10 transition-colors" />
+            <div className="flex justify-between items-start gap-4">
+              <div>
+                <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1 flex items-center gap-1.5">
+                  <Zap size={12} className="text-brand-400 animate-pulse" /> AI Alpha Score (Multi-Factor)
+                </div>
+                <div className="text-3.5xl font-extrabold font-mono text-white mt-1.5 flex items-baseline">
+                  {researchData.alpha_score.score}
+                  <span className="text-xs text-gray-500 font-normal ml-1"> / 100</span>
+                </div>
+                <div className="text-xs text-gray-400 mt-2 leading-relaxed flex items-center gap-2">
+                  Rating: <span className="text-brand-400 font-bold">{researchData.alpha_score.rating}</span> · Risk: <span className="text-amber-400 font-semibold">{researchData.alpha_score.expected_risk}</span>
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-[10px] text-gray-400 uppercase font-semibold">Expected Return</div>
+                <div className="text-2xl font-bold font-mono text-brand-400 mt-1">+{researchData.alpha_score.expected_upside}%</div>
+                <div className="text-[10px] text-gray-500 mt-0.5">MOS: {researchData.alpha_score.margin_of_safety}%</div>
+              </div>
+            </div>
+            <div className="border-t border-white/5 pt-3 mt-4 flex items-center justify-between text-xs gap-3">
+              <span className="text-gray-400 truncate max-w-[70%] italic">"{researchData.alpha_score.explanation}"</span>
+              <button 
+                onClick={() => setActiveTab('research')} 
+                className="text-brand-400 hover:text-white transition-colors font-bold flex items-center gap-1 flex-shrink-0"
+              >
+                Research Terminal <span className="text-xs">→</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Professional Composite Score Banner Card */}
+          <div className="card flex flex-col justify-between border-accent-blue/15 hover:border-accent-blue/30 transition-all duration-300 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-accent-blue/5 rounded-full blur-2xl pointer-events-none group-hover:bg-accent-blue/10 transition-colors" />
+            <div className="flex justify-between items-start gap-4">
+              <div>
+                <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider mb-1 flex items-center gap-1.5">
+                  <Coins size={12} className="text-accent-blue" /> Intrinsic Value Engine
+                </div>
+                <div className="text-3.5xl font-extrabold font-mono text-white mt-1.5">
+                  ₹{researchData.intrinsic_value.value.toLocaleString('en-IN')}
+                </div>
+                <div className="text-xs text-gray-400 mt-2 leading-relaxed">
+                  MOS: <span className="text-brand-400 font-bold">{researchData.intrinsic_value.margin_of_safety}%</span> · Current: ₹{stock.current_price?.toLocaleString('en-IN')}
+                </div>
+              </div>
+              <div className="text-right shrink-0">
+                <div className="text-[10px] text-gray-400 uppercase font-semibold">Composite Score</div>
+                <div className="text-2xl font-bold font-mono text-white mt-1">{researchData.composite_score.score}</div>
+                <div className="text-[10px] uppercase font-extrabold text-accent-blue mt-0.5 tracking-wider">{researchData.composite_score.classification}</div>
+              </div>
+            </div>
+            <div className="border-t border-white/5 pt-3 mt-4 flex items-center justify-between text-xs gap-3">
+              <span className="text-gray-400 truncate max-w-[70%]">9-model valuation aggregate including DCF and Graham formulas.</span>
+              <button 
+                onClick={() => setActiveTab('research')} 
+                className="text-brand-400 hover:text-white transition-colors font-bold flex items-center gap-1 flex-shrink-0"
+              >
+                Inspect Models <span className="text-xs">→</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tabs: Fundamentals / Forecast / Research Terminal / Alert */}
       <div className="card">
-        <div className="flex gap-1.5 p-1.5 bg-black/60 border border-white/[0.04] rounded-2xl w-fit mb-5 backdrop-blur-md">
-          {(['fundamentals', 'forecast', 'alert'] as const).map(t => (
+        <div className="flex flex-wrap gap-1.5 p-1.5 bg-black/60 border border-white/[0.04] rounded-2xl w-fit mb-5 backdrop-blur-md">
+          {(['fundamentals', 'research', 'forecast', 'alert'] as const).map(t => (
             <button
               key={t}
               onClick={() => setActiveTab(t)}
@@ -802,7 +897,7 @@ export default function StockDetailPage() {
                   : 'text-gray-400 hover:text-white hover:bg-white/[0.02] border-transparent'
               }`}
             >
-              {t === 'alert' ? '🔔 Set Alert' : t === 'forecast' ? '🔮 AI Forecast' : '📊 Fundamentals'}
+              {t === 'alert' ? '🔔 Set Alert' : t === 'forecast' ? '🔮 AI Forecast' : t === 'research' ? '🏛️ Research Terminal' : '📊 Fundamentals'}
             </button>
           ))}
         </div>
@@ -825,10 +920,718 @@ export default function StockDetailPage() {
             error={analysisError}
             onRefresh={fetchAnalysis}
           />
+        ) : activeTab === 'research' ? (
+          // INSTITUTIONAL RESEARCH DASHBOARD
+          loadingResearch ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <RefreshCw className="animate-spin text-brand-400" size={28} />
+              <p className="text-gray-500 text-sm">Evaluating DCF projections, auditing balance sheet ratios, parsing shareholding patterns...</p>
+            </div>
+          ) : researchError || !researchData ? (
+            <div className="text-center py-10 space-y-4">
+              <p className="text-red-400 text-sm">{researchError || 'Terminal research data not loaded'}</p>
+              <button onClick={fetchResearch} className="btn-outline text-xs flex items-center gap-1.5 mx-auto">
+                <RefreshCw size={12} /> Retry Load
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-8 animate-fade-in text-gray-200">
+              {/* HEADER BANNER */}
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 p-4 rounded-xl bg-white/[0.01] border border-white/5">
+                <div>
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                    {researchData.company_name} Terminal Report
+                    <span className="badge-blue text-[10px] font-mono">{researchData.ticker}</span>
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">Programmatic analysis calculated on real historical financials and daily ticker tick history.</p>
+                </div>
+                <div className="flex items-center gap-3 font-mono text-xs text-gray-400">
+                  <span>As of: {new Date(researchData.timestamp).toLocaleString('en-IN')}</span>
+                  <button onClick={fetchResearch} className="btn-icon" title="Refresh calculations">
+                    <RefreshCw size={12} />
+                  </button>
+                </div>
+              </div>
+
+              {/* BUY / SELL ENGINE & INVESTMENT RECOMMENDATION */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="card lg:col-span-2 space-y-4 border-l-4 border-brand-500">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-sm font-bold uppercase tracking-wider text-brand-400 flex items-center gap-2">
+                      <Target size={15} /> Buy / Hold / Sell Strategy Decision
+                    </h4>
+                    <span className="badge-blue text-xs font-mono font-bold">Confidence: {researchData.recommendation_engine.confidence}%</span>
+                  </div>
+                  
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-3xl font-extrabold text-white">{researchData.recommendation_engine.recommendation}</span>
+                    <span className="text-xs text-gray-400">Expected Return: <strong className="text-brand-400 font-mono">+{researchData.recommendation_engine.expected_return}%</strong></span>
+                  </div>
+
+                  <div className="space-y-2 mt-2">
+                    {researchData.recommendation_engine.reasons.map((r: string, i: number) => (
+                      <div key={i} className="flex items-start gap-2 text-xs text-gray-300 leading-relaxed">
+                        <span className="text-brand-400 font-bold shrink-0 mt-0.5">✓</span>
+                        <p>{r}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="card space-y-3 justify-between flex flex-col">
+                  <div>
+                    <h4 className="text-xs text-gray-500 uppercase font-bold tracking-wider">Target & Return Ratios</h4>
+                    <div className="grid grid-cols-2 gap-3 mt-3">
+                      <div>
+                        <div className="text-[10px] text-gray-500 uppercase font-semibold">Fair Value</div>
+                        <div className="text-base font-bold font-mono text-white">₹{researchData.recommendation_engine.fair_value.toLocaleString('en-IN')}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-gray-500 uppercase font-semibold">Target Price</div>
+                        <div className="text-base font-bold font-mono text-brand-400">₹{researchData.recommendation_engine.target_price.toLocaleString('en-IN')}</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="border-t border-white/5 pt-3 flex justify-between items-center text-xs">
+                    <span className="text-gray-400">Risk-Reward Ratio</span>
+                    <span className="font-bold font-mono text-white">{researchData.recommendation_engine.risk_reward_ratio}:1</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* CORE SCORES GRID */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* AI ALPHA SCORE breakdown */}
+                <div className="card space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                      <Zap size={14} className="text-brand-400" /> AI Alpha Score Breakdown
+                    </h4>
+                    <button 
+                      onClick={() => setExpandedAlpha(!expandedAlpha)} 
+                      className="text-xs text-brand-400 hover:text-white transition-colors flex items-center gap-1"
+                    >
+                      {expandedAlpha ? 'Collapse' : 'Show weights'} {expandedAlpha ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full border-4 border-brand-500/20 border-t-brand-500 flex items-center justify-center font-mono text-xl font-bold text-white">
+                      {researchData.alpha_score.score}
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-300 font-semibold">{researchData.alpha_score.rating} Rating</div>
+                      <p className="text-[11px] text-gray-500 leading-normal mt-0.5">Calculated using a 15-factor valuation, fundamental, technical, and news sentiment formula.</p>
+                    </div>
+                  </div>
+
+                  {expandedAlpha && (
+                    <div className="space-y-1.5 pt-2 border-t border-white/5 text-xs font-mono">
+                      <div className="flex justify-between py-1 border-b border-white/5">
+                        <span className="text-gray-400">DCF Score (12%)</span>
+                        <span className="text-white">{researchData.composite_score.breakdown["DCF (25%)"] * 2} / 100</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-white/5">
+                        <span className="text-gray-400">Buffett Quality (10%)</span>
+                        <span className="text-white">{researchData.alpha_score.score ? researchData.alpha_score.score : '—'}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-white/5">
+                        <span className="text-gray-400">Piotroski F-Score (10%)</span>
+                        <span className="text-white">{(researchData.piotroski_score.score / 9 * 100).toFixed(0)} / 100</span>
+                      </div>
+                      <div className="flex justify-between py-1">
+                        <span className="text-brand-400 cursor-pointer flex items-center gap-1" onClick={() => setCalcInspector({
+                          title: "AI Alpha Score",
+                          formula: researchData.explainability.alpha_score.formula,
+                          inputs: researchData.explainability.alpha_score.inputs,
+                          interpretation: researchData.explainability.alpha_score.interpretation
+                        })}>
+                          <HelpCircle size={11} /> View entire weighted formula
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Professional Composite Score Breakdown */}
+                <div className="card space-y-4">
+                  <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <Scale size={14} className="text-accent-blue" /> Professional Composite Score
+                  </h4>
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-full border-4 border-accent-blue/20 border-t-accent-blue flex items-center justify-center font-mono text-xl font-bold text-white">
+                      {researchData.composite_score.score}
+                    </div>
+                    <div>
+                      <div className="text-xs text-gray-300 font-semibold">{researchData.composite_score.classification} Rating</div>
+                      <p className="text-[11px] text-gray-500 leading-normal mt-0.5">Weighted heavily towards intrinsic DCF calculations, debt profiles, and capital return ratios.</p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] font-mono border-t border-white/5 pt-3">
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-500">DCF (25%)</span>
+                      <span className="text-white">{researchData.composite_score.breakdown["DCF (25%)"]}</span>
+                    </div>
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-500">Buffett (15%)</span>
+                      <span className="text-white">{researchData.composite_score.breakdown["Buffett Quality (15%)"]}</span>
+                    </div>
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-500">Piotroski (15%)</span>
+                      <span className="text-white">{researchData.composite_score.breakdown["Piotroski F Score (15%)"]}</span>
+                    </div>
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-500">Altman (10%)</span>
+                      <span className="text-white">{researchData.composite_score.breakdown["Altman Z Score (10%)"]}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* INTRINSIC VALUATION ENGINE TABLE */}
+              <div className="card space-y-4">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <Coins size={14} className="text-brand-400" /> Intrinsic Valuation Models
+                  </h4>
+                  <button 
+                    onClick={() => setCalcInspector({
+                      title: "Discounted Cash Flow Model",
+                      formula: researchData.explainability.dcf.formula,
+                      inputs: researchData.explainability.dcf.inputs,
+                      interpretation: researchData.explainability.dcf.interpretation
+                    })}
+                    className="text-xs text-gray-400 hover:text-brand-400 transition-colors flex items-center gap-1"
+                  >
+                    <HelpCircle size={12} /> How is DCF calculated?
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-white/5 pb-4">
+                  <div className="p-3 bg-red-500/[0.01] border border-red-500/5 rounded-xl text-center space-y-1">
+                    <div className="text-[10px] text-gray-500 uppercase font-semibold">Bear Case (DCF)</div>
+                    <div className="text-lg font-bold font-mono text-red-400">₹{researchData.intrinsic_value.cases.bear.toLocaleString('en-IN')}</div>
+                  </div>
+                  <div className="p-3 bg-white/[0.01] border border-white/5 rounded-xl text-center space-y-1">
+                    <div className="text-[10px] text-gray-500 uppercase font-semibold">Base Case (DCF)</div>
+                    <div className="text-lg font-bold font-mono text-white">₹{researchData.intrinsic_value.cases.base.toLocaleString('en-IN')}</div>
+                  </div>
+                  <div className="p-3 bg-brand-500/[0.01] border border-brand-500/5 rounded-xl text-center space-y-1">
+                    <div className="text-[10px] text-gray-500 uppercase font-semibold">Bull Case (DCF)</div>
+                    <div className="text-lg font-bold font-mono text-brand-400">₹{researchData.intrinsic_value.cases.bull.toLocaleString('en-IN')}</div>
+                  </div>
+                </div>
+
+                {/* Models Comparison Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-left">
+                    <thead>
+                      <tr className="border-b border-white/5 text-gray-500 uppercase font-bold text-[10px] tracking-wider">
+                        <th className="py-2.5">Valuation Model</th>
+                        <th className="py-2.5">Estimated Price</th>
+                        <th className="py-2.5">vs Current Price</th>
+                        <th className="py-2.5">Margin of Safety</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 font-mono">
+                      <tr>
+                        <td className="py-2.5 text-gray-300 font-sans">Discounted Cash Flow (DCF)</td>
+                        <td className="py-2.5 text-white">₹{researchData.intrinsic_value.models.dcf.toLocaleString('en-IN')}</td>
+                        <td className={`py-2.5 ${researchData.intrinsic_value.models.dcf > (stock.current_price || 0) ? 'text-brand-400' : 'text-red-400'}`}>
+                          {stock.current_price ? (((researchData.intrinsic_value.models.dcf - stock.current_price) / stock.current_price) * 100).toFixed(1) : 0.0}%
+                        </td>
+                        <td className="py-2.5 text-gray-400">{stock.current_price ? (((researchData.intrinsic_value.models.dcf - stock.current_price) / researchData.intrinsic_value.models.dcf) * 100).toFixed(1) : 0.0}%</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 text-gray-300 font-sans flex items-center gap-1.5">
+                          Benjamin Graham Formula
+                          <HelpCircle size={12} className="text-gray-600 hover:text-white cursor-pointer" onClick={() => setCalcInspector({
+                            title: "Benjamin Graham Value",
+                            formula: researchData.explainability.graham.formula,
+                            inputs: researchData.explainability.graham.inputs,
+                            interpretation: researchData.explainability.graham.interpretation
+                          })} />
+                        </td>
+                        <td className="py-2.5 text-white">₹{researchData.intrinsic_value.models.graham.toLocaleString('en-IN')}</td>
+                        <td className={`py-2.5 ${researchData.intrinsic_value.models.graham > (stock.current_price || 0) ? 'text-brand-400' : 'text-red-400'}`}>
+                          {stock.current_price ? (((researchData.intrinsic_value.models.graham - stock.current_price) / stock.current_price) * 100).toFixed(1) : 0.0}%
+                        </td>
+                        <td className="py-2.5 text-gray-400">{stock.current_price ? (((researchData.intrinsic_value.models.graham - stock.current_price) / researchData.intrinsic_value.models.graham) * 100).toFixed(1) : 0.0}%</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 text-gray-300 font-sans">Peter Lynch Fair Value</td>
+                        <td className="py-2.5 text-white">₹{researchData.intrinsic_value.models.lynch.toLocaleString('en-IN')}</td>
+                        <td className={`py-2.5 ${researchData.intrinsic_value.models.lynch > (stock.current_price || 0) ? 'text-brand-400' : 'text-red-400'}`}>
+                          {stock.current_price ? (((researchData.intrinsic_value.models.lynch - stock.current_price) / stock.current_price) * 100).toFixed(1) : 0.0}%
+                        </td>
+                        <td className="py-2.5 text-gray-400">{stock.current_price ? (((researchData.intrinsic_value.models.lynch - stock.current_price) / researchData.intrinsic_value.models.lynch) * 100).toFixed(1) : 0.0}%</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 text-gray-300 font-sans">Owner Earnings Model</td>
+                        <td className="py-2.5 text-white">₹{researchData.intrinsic_value.models.owner_earnings.toLocaleString('en-IN')}</td>
+                        <td className={`py-2.5 ${researchData.intrinsic_value.models.owner_earnings > (stock.current_price || 0) ? 'text-brand-400' : 'text-red-400'}`}>
+                          {stock.current_price ? (((researchData.intrinsic_value.models.owner_earnings - stock.current_price) / stock.current_price) * 100).toFixed(1) : 0.0}%
+                        </td>
+                        <td className="py-2.5 text-gray-400">{stock.current_price ? (((researchData.intrinsic_value.models.owner_earnings - stock.current_price) / researchData.intrinsic_value.models.owner_earnings) * 100).toFixed(1) : 0.0}%</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2.5 text-gray-300 font-sans">EV / EBITDA Model</td>
+                        <td className="py-2.5 text-white">₹{researchData.intrinsic_value.models.ev_ebitda.toLocaleString('en-IN')}</td>
+                        <td className={`py-2.5 ${researchData.intrinsic_value.models.ev_ebitda > (stock.current_price || 0) ? 'text-brand-400' : 'text-red-400'}`}>
+                          {stock.current_price ? (((researchData.intrinsic_value.models.ev_ebitda - stock.current_price) / stock.current_price) * 100).toFixed(1) : 0.0}%
+                        </td>
+                        <td className="py-2.5 text-gray-400">{stock.current_price ? (((researchData.intrinsic_value.models.ev_ebitda - stock.current_price) / researchData.intrinsic_value.models.ev_ebitda) * 100).toFixed(1) : 0.0}%</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* BUFFETT QUALITY ANALYSIS & PETER LYNCH */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Buffett Quality Analysis */}
+                <div className="card space-y-4">
+                  <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <Sparkles size={14} className="text-brand-400" /> Buffett Moat & Quality Analysis
+                  </h4>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
+                    <div className="flex justify-between py-1 border-b border-white/5">
+                      <span className="text-gray-400">ROE (FY26)</span>
+                      <span className={`font-mono font-bold ${researchData.buffett_analysis.ratings.ROE === 'Excellent' ? 'text-brand-400' : 'text-gray-300'}`}>
+                        {researchData.buffett_analysis.metrics.roe}% ({researchData.buffett_analysis.ratings.ROE})
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-white/5">
+                      <span className="text-gray-400">ROIC (FY26)</span>
+                      <span className={`font-mono font-bold ${researchData.buffett_analysis.ratings.ROIC === 'Excellent' ? 'text-brand-400' : 'text-gray-300'}`}>
+                        {researchData.buffett_analysis.metrics.roic}% ({researchData.buffett_analysis.ratings.ROIC})
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-white/5">
+                      <span className="text-gray-400">Debt to Equity</span>
+                      <span className="font-mono font-bold text-white">
+                        {researchData.buffett_analysis.metrics.debt_equity.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-white/5">
+                      <span className="text-gray-400">Operating Margin</span>
+                      <span className="font-mono font-bold text-white">
+                        {researchData.buffett_analysis.metrics.op_margin}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-white/[0.01] border border-white/5 rounded-xl text-xs space-y-1">
+                    <div className="flex justify-between text-gray-500 font-semibold">
+                      <span>Capital Reinvestment</span>
+                      <span>Dividend Growth</span>
+                    </div>
+                    <div className="flex justify-between text-white font-mono">
+                      <span>{researchData.buffett_analysis.history.capital_allocation}</span>
+                      <span>{researchData.buffett_analysis.history.dividend_growth}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Peter Lynch growth analysis */}
+                <div className="card space-y-4">
+                  <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <TrendingUp size={14} className="text-brand-400" /> Peter Lynch Growth Audit
+                  </h4>
+                  <div className="space-y-3 text-xs leading-normal">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <div className="text-[10px] text-gray-500 uppercase font-semibold">PEG Ratio</div>
+                        <div className="text-lg font-bold font-mono text-white mt-0.5">{researchData.lynch_analysis.peg}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-gray-500 uppercase font-semibold">Lynch Rating</div>
+                        <div className="text-lg font-bold font-mono text-brand-400 mt-0.5">{researchData.lynch_analysis.valuation_rating}</div>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-white/[0.01] border border-white/5 rounded-xl">
+                      <p className="text-gray-300 text-[11px] leading-relaxed italic">"{researchData.lynch_analysis.reason}"</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* PIOTROSKI F SCORE & ALTMAN Z SCORE */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Piotroski F-Score */}
+                <div className="card space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                      <Activity size={14} className="text-brand-400" /> Piotroski F-Score ({researchData.piotroski_score.score} / 9)
+                    </h4>
+                    <span 
+                      className="text-xs text-brand-400 hover:text-white cursor-pointer"
+                      onClick={() => setCalcInspector({
+                        title: "Piotroski F-Score",
+                        formula: researchData.explainability.piotroski.formula,
+                        inputs: researchData.explainability.piotroski.inputs,
+                        interpretation: researchData.explainability.piotroski.interpretation
+                      })}
+                    >
+                      Inspect Rules
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2 text-xs">
+                    {Object.entries(researchData.piotroski_score.reasons).map(([key, val]: any) => (
+                      <div key={key} className="flex items-center justify-between py-1 border-b border-white/5 gap-4">
+                        <span className="text-gray-400">{key}</span>
+                        <div className="flex items-center gap-1.5 font-semibold">
+                          <span className="text-[10px] text-gray-500 font-normal truncate max-w-[150px] md:max-w-xs">{val[1]}</span>
+                          {val[0] === 'Pass' ? <CheckCircle2 size={13} className="text-brand-400" /> : <XCircle size={13} className="text-red-400" />}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Altman Z-Score */}
+                <div className="card space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                      <ShieldAlert size={14} className="text-amber-400" /> Altman Z-Score Insolvency Audit
+                    </h4>
+                    <span 
+                      className="text-xs text-brand-400 hover:text-white cursor-pointer"
+                      onClick={() => setCalcInspector({
+                        title: "Altman Z-Score",
+                        formula: researchData.explainability.altman_z.formula,
+                        inputs: researchData.explainability.altman_z.inputs,
+                        interpretation: researchData.explainability.altman_z.interpretation
+                      })}
+                    >
+                      Inspect Formula
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                    <div>
+                      <div className="text-[10px] text-gray-500 uppercase font-semibold">Altman Z-Score</div>
+                      <div className="text-2xl font-bold font-mono text-white mt-0.5">{researchData.altman_score.score}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[10px] text-gray-500 uppercase font-semibold">Financial Zone</div>
+                      <div className={`text-base font-extrabold mt-0.5 px-3 py-1 rounded ${
+                        researchData.altman_score.zone === 'Safe' ? 'bg-brand-500/10 text-brand-400 border border-brand-500/20' :
+                        researchData.altman_score.zone === 'Grey Zone' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                        'bg-red-500/10 text-red-400 border border-red-500/20'
+                      }`}>{researchData.altman_score.zone}</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs font-mono">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500 font-sans">A: Working Capital / Assets</span>
+                      <span className="text-white">{researchData.altman_score.components.working_capital_ratio_A}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500 font-sans">B: Retained Earnings / Assets</span>
+                      <span className="text-white">{researchData.altman_score.components.retained_earnings_ratio_B}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500 font-sans">C: EBITDA / Assets</span>
+                      <span className="text-white">{researchData.altman_score.components.ebitda_ratio_C}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500 font-sans">D: Equity Value / Liabilities</span>
+                      <span className="text-white">{researchData.altman_score.components.equity_leverage_ratio_D}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SMART MONEY & RISK */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Smart Money Analysis */}
+                <div className="card space-y-4">
+                  <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <Coins size={14} className="text-brand-400" /> Smart Money & Ownership Patterns
+                  </h4>
+                  <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                    <div>
+                      <div className="text-[10px] text-gray-500 uppercase font-semibold">Smart Money Score</div>
+                      <div className="text-xl font-bold font-mono text-white mt-0.5">{researchData.smart_money.score} / 100</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[10px] text-gray-500 uppercase font-semibold">Institutional Trend</div>
+                      <div className="text-sm font-bold text-brand-400 mt-0.5">{researchData.smart_money.institutional_buying_trend}</div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-400">Promoter Holding</span>
+                      <span className="font-mono text-white">{researchData.smart_money.promoter_holding}%</span>
+                    </div>
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-400">FII Holding</span>
+                      <span className="font-mono text-white">{researchData.smart_money.fii_holding}%</span>
+                    </div>
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-400">DII Holding</span>
+                      <span className="font-mono text-white">{researchData.smart_money.dii_holding}%</span>
+                    </div>
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-400">Pledged Shares</span>
+                      <span className="font-mono text-white">{researchData.smart_money.pledged_shares}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Risk Analysis */}
+                <div className="card space-y-4">
+                  <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <ShieldAlert size={14} className="text-red-400" /> Portfolio Risk Metrics
+                  </h4>
+                  <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                    <div>
+                      <div className="text-[10px] text-gray-500 uppercase font-semibold">Risk Score</div>
+                      <div className="text-xl font-bold font-mono text-red-400 mt-0.5">{researchData.risk_analysis.score} / 100</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-[10px] text-gray-500 uppercase font-semibold">Beta vs Benchmark</div>
+                      <div className="text-sm font-bold text-white mt-0.5">{researchData.risk_analysis.beta.toFixed(2)}</div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-400">Annual Volatility</span>
+                      <span className="font-mono text-white">{researchData.risk_analysis.volatility.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-400">Downside VaR (95%)</span>
+                      <span className="font-mono text-white">{researchData.risk_analysis.downside_risk.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-400">Financial Risk</span>
+                      <span className="font-mono text-white">{researchData.risk_analysis.financial_risk}</span>
+                    </div>
+                    <div className="flex justify-between py-0.5">
+                      <span className="text-gray-400">Liquidity Risk</span>
+                      <span className="font-mono text-white">{researchData.risk_analysis.liquidity_risk}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* TECHNICAL TIMING & MOMENTUM */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Technical Timing */}
+                <div className="card space-y-4">
+                  <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <Activity size={14} className="text-brand-400" /> Technical Timing indicators
+                  </h4>
+                  <div className="grid grid-cols-3 gap-2 border-b border-white/5 pb-3">
+                    <div className="text-center">
+                      <div className="text-[9px] text-gray-500 uppercase font-semibold">Entry</div>
+                      <div className="text-xs font-bold text-white">{researchData.technical_timing.entry_rating}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[9px] text-gray-500 uppercase font-semibold">Swing</div>
+                      <div className="text-xs font-bold text-brand-400">{researchData.technical_timing.swing_rating}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-[9px] text-gray-500 uppercase font-semibold">RSI (14)</div>
+                      <div className="text-xs font-bold font-mono text-white">{researchData.technical_timing.rsi}</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 text-xs font-mono">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500 font-sans">EMA 20 / EMA 50</span>
+                      <span className="text-white">₹{researchData.technical_timing.ema_20} / ₹{researchData.technical_timing.ema_50}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500 font-sans">EMA 200 Support</span>
+                      <span className="text-white">₹{researchData.technical_timing.ema_200}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500 font-sans">MACD Histogram</span>
+                      <span className="text-white">{researchData.technical_timing.macd.histogram}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500 font-sans">SuperTrend Direction</span>
+                      <span className="text-white">{researchData.technical_timing.supertrend}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Momentum Engine */}
+                <div className="card space-y-4">
+                  <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                    <TrendingUp size={14} className="text-brand-400" /> Momentum Engine Performance
+                  </h4>
+                  <div className="grid grid-cols-4 gap-1 text-center font-mono border-b border-white/5 pb-3">
+                    <div className="p-1 rounded bg-white/[0.01]">
+                      <div className="text-[9px] text-gray-500 font-sans">1M</div>
+                      <div className={`text-xs font-bold ${researchData.momentum_engine.returns["1m"] >= 0 ? 'text-brand-400' : 'text-red-400'}`}>
+                        {researchData.momentum_engine.returns["1m"]}%
+                      </div>
+                    </div>
+                    <div className="p-1 rounded bg-white/[0.01]">
+                      <div className="text-[9px] text-gray-500 font-sans">3M</div>
+                      <div className={`text-xs font-bold ${researchData.momentum_engine.returns["3m"] >= 0 ? 'text-brand-400' : 'text-red-400'}`}>
+                        {researchData.momentum_engine.returns["3m"]}%
+                      </div>
+                    </div>
+                    <div className="p-1 rounded bg-white/[0.01]">
+                      <div className="text-[9px] text-gray-500 font-sans">6M</div>
+                      <div className={`text-xs font-bold ${researchData.momentum_engine.returns["6m"] >= 0 ? 'text-brand-400' : 'text-red-400'}`}>
+                        {researchData.momentum_engine.returns["6m"]}%
+                      </div>
+                    </div>
+                    <div className="p-1 rounded bg-white/[0.01]">
+                      <div className="text-[9px] text-gray-500 font-sans">1Y</div>
+                      <div className={`text-xs font-bold ${researchData.momentum_engine.returns["1y"] >= 0 ? 'text-brand-400' : 'text-red-400'}`}>
+                        {researchData.momentum_engine.returns["1y"]}%
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Relative Strength (vs Nifty)</span>
+                      <span className="font-mono text-white">{researchData.momentum_engine.relative_strength}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">52W Position Percentile</span>
+                      <span className="font-mono text-white">{researchData.momentum_engine.position_52w_pct}%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* NEWS SENTIMENT AI */}
+              <div className="card space-y-4">
+                <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-brand-400" /> News Sentiment AI Analysis
+                </h4>
+                <div className="flex flex-col md:flex-row gap-4 items-center border-b border-white/5 pb-3">
+                  <div className="w-20 h-20 rounded-full border-4 border-brand-500/20 border-t-brand-500 flex flex-col items-center justify-center font-mono shrink-0">
+                    <span className="text-base font-bold text-white">{researchData.news_sentiment.sentiment_pct.toFixed(0)}%</span>
+                    <span className="text-[8px] text-gray-500 uppercase">Sentiment</span>
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-bold text-white">Sentiment Summary</h5>
+                    <p className="text-xs text-gray-400 leading-relaxed mt-1 italic">"{researchData.news_sentiment.summary}"</p>
+                  </div>
+                </div>
+                <div className="text-xs space-y-1.5">
+                  <div className="text-gray-500 font-semibold uppercase tracking-wider text-[10px]">Business & Trading Impact</div>
+                  <p className="text-gray-300 leading-normal">{researchData.news_sentiment.impact}</p>
+                </div>
+              </div>
+
+              {/* AI INVESTMENT SUMMARY */}
+              <div className="card space-y-4">
+                <h4 className="text-sm font-bold text-white flex items-center gap-1.5">
+                  <Info size={14} className="text-brand-400" /> AI Executive Research Summary
+                </h4>
+                <div className="space-y-4 text-xs">
+                  <div>
+                    <div className="text-gray-500 font-semibold uppercase tracking-wider text-[10px] mb-1">Moat & Market Positioning</div>
+                    <p className="text-gray-300 leading-relaxed">{researchData.investment_summary.competitive_position}</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-gray-500 font-semibold uppercase tracking-wider text-[10px] mb-1.5">Investment Strengths</div>
+                      <div className="space-y-1.5">
+                        {researchData.investment_summary.strengths.map((s: string, i: number) => (
+                          <div key={i} className="text-brand-400 flex items-center gap-1">
+                            <span>▲</span> <span className="text-gray-300">{s}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-gray-500 font-semibold uppercase tracking-wider text-[10px] mb-1.5">Investment Risks & Concerns</div>
+                      <div className="space-y-1.5">
+                        {researchData.investment_summary.key_risks.map((r: string, i: number) => (
+                          <div key={i} className="text-red-400 flex items-center gap-1">
+                            <span>▼</span> <span className="text-gray-300">{r}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-white/5 pt-3 grid grid-cols-2 gap-4">
+                    <div>
+                      <div className="text-gray-500 font-semibold uppercase tracking-wider text-[10px] mb-0.5">Suggested Investment Horizon</div>
+                      <p className="text-white font-mono">{researchData.investment_summary.suggested_horizon}</p>
+                    </div>
+                    <div>
+                      <div className="text-gray-500 font-semibold uppercase tracking-wider text-[10px] mb-0.5">Suitable For</div>
+                      <p className="text-white truncate">{researchData.investment_summary.suitable_for.join(", ")}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
         ) : (
           <SetAlertForm ticker={stock.ticker} currentPrice={stock.current_price} onCreated={() => {}} />
         )}
       </div>
+
+      {/* CALCULATION INSPECTOR MODAL */}
+      {calcInspector && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-white/10 p-6 rounded-2xl w-full max-w-lg space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-start">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <Info size={16} className="text-brand-400" /> Calculation Inspector: {calcInspector.title}
+              </h3>
+              <button 
+                onClick={() => setCalcInspector(null)}
+                className="text-gray-500 hover:text-white transition-colors font-mono text-base font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs leading-normal">
+              <div>
+                <span className="text-gray-500 font-bold uppercase tracking-wider text-[9px]">Mathematical Formula</span>
+                <div className="bg-white/5 p-3 rounded-lg font-mono text-white mt-1 border border-white/5 overflow-x-auto text-[11px]">
+                  {calcInspector.formula}
+                </div>
+              </div>
+
+              <div>
+                <span className="text-gray-500 font-bold uppercase tracking-wider text-[9px]">Actual Inputs Used</span>
+                <div className="bg-black/40 border border-white/5 p-3 rounded-lg space-y-2 mt-1 font-mono text-[11px]">
+                  {Object.entries(calcInspector.inputs).map(([key, val]: any) => (
+                    <div key={key} className="flex justify-between">
+                      <span className="text-gray-500 font-sans">{key.replace(/_/g, ' ')}</span>
+                      <span className="text-white">{typeof val === 'number' ? val.toLocaleString('en-IN') : JSON.stringify(val)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <span className="text-gray-500 font-bold uppercase tracking-wider text-[9px]">Financial Meaning</span>
+                <p className="text-gray-300 mt-1 leading-relaxed">{calcInspector.interpretation}</p>
+              </div>
+            </div>
+
+            <div className="border-t border-white/5 pt-3 flex justify-end">
+              <button onClick={() => setCalcInspector(null)} className="btn-primary text-xs px-4 py-1.5">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAddModal && <AddStockModal onClose={() => setShowAddModal(false)} onAdded={refreshUser} />}
     </div>

@@ -464,6 +464,8 @@ async def scrape_extended_stock_data(ticker: str, exchange: str = "NSE") -> dict
             result["quarterly_results"] = parse_table("quarters")
             result["profit_loss"] = parse_table("profit-loss")
             result["shareholding_pattern"] = parse_table("shareholding")
+            result["balance_sheet"] = parse_table("balance-sheet")
+            result["cash_flow"] = parse_table("cash-flow")
             
             analysis_section = soup.find(id="analysis")
             if analysis_section:
