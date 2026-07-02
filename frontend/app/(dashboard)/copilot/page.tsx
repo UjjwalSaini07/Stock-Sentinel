@@ -200,6 +200,7 @@ export default function CopilotPage() {
   // custom journal timelines
   const [customLogs, setCustomLogs] = useState<Record<string, { event: string; detail: string }[]>>({})
   const [activeNoteText, setActiveNoteText] = useState<Record<string, string>>({})
+  const [playbookSubTabs, setPlaybookSubTabs] = useState<Record<string, string>>({})
 
   const addJournalEntry = (ticker: string) => {
     const note = activeNoteText[ticker]?.trim()
@@ -1603,9 +1604,17 @@ export default function CopilotPage() {
                     const customTimeline = customLogs[play.ticker] || []
                     const fullTimeline = [...timeline, ...customTimeline]
                     
-                    // Dynamic check parameters
                     const isStillValid = validation?.status === "Still Valid"
-                    const convScore = isStillValid ? 95 : (validation?.status === "Partially Valid" ? 70 : 45)
+                    const convScore = play.executive_summary?.conviction || (isStillValid ? 95 : 45)
+                    const activeSubTab = playbookSubTabs[play.ticker] || 'summary'
+
+                    const subTabs = [
+                      { id: 'summary', label: 'Summary' },
+                      { id: 'pillars', label: 'Pillars' },
+                      { id: 'scorecard', label: 'Audit' },
+                      { id: 'playbook', label: 'Zones' },
+                      { id: 'journal', label: 'Journal' }
+                    ]
 
                     return (
                       <div key={idx} className="card bg-black/60 border border-white/5 p-6 rounded-2xl space-y-5 hover:border-white/10 transition-all flex flex-col justify-between">
@@ -1625,88 +1634,296 @@ export default function CopilotPage() {
                           </span>
                         </div>
 
-                        {/* Confidence Progress Ring & Original Thesis */}
-                        <div className="flex items-start gap-4 bg-white/[0.01] p-3.5 rounded-xl border border-white/5">
-                          <div className="relative w-12 h-12 shrink-0">
-                            <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                              <path className="text-white/5" strokeWidth="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                              <path className={isStillValid ? "text-brand-500" : "text-red-500"} strokeDasharray={`${convScore}, 100`} strokeWidth="3" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                            </svg>
-                            <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white font-mono">{convScore}%</span>
-                          </div>
-                          <div className="text-xs">
-                            <span className="text-[9px] uppercase font-bold text-gray-500 font-mono block">Investment Thesis Log</span>
-                            <p className="text-gray-200 mt-1 leading-normal font-sans">{validation?.original_thesis}</p>
-                          </div>
+                        {/* Secondary tab switcher */}
+                        <div className="flex gap-1 border-b border-white/5 pb-2">
+                          {subTabs.map(subTab => (
+                            <button
+                              key={subTab.id}
+                              onClick={() => setPlaybookSubTabs(prev => ({ ...prev, [play.ticker]: subTab.id }))}
+                              className={`px-2 py-1 rounded text-[10px] font-bold uppercase transition-all ${
+                                activeSubTab === subTab.id
+                                  ? 'bg-brand-500/10 text-brand-400 border border-brand-500/20'
+                                  : 'text-gray-500 hover:text-white'
+                              }`}
+                            >
+                              {subTab.label}
+                            </button>
+                          ))}
                         </div>
 
-                        {/* Deterioration alert if invalid */}
-                        {!isStillValid && validation?.current_reality && (
-                          <div className="p-3 bg-red-500/5 border border-red-500/10 rounded-xl text-xs text-red-400 leading-normal font-sans">
-                            <strong>Deterioration Warning:</strong> {validation.current_reality}
+                        {/* Tab Content: Summary */}
+                        {activeSubTab === 'summary' && play.executive_summary && (
+                          <div className="space-y-4 animate-slide-up">
+                            {/* Key parameters grid */}
+                            <div className="grid grid-cols-3 gap-2.5 text-center font-mono text-[10px]">
+                              <div className="p-2 bg-white/[0.01] border border-white/5 rounded-xl">
+                                <span className="block text-[8px] text-gray-500 uppercase font-bold">Conviction</span>
+                                <span className="text-white font-extrabold">{play.executive_summary.conviction}%</span>
+                              </div>
+                              <div className="p-2 bg-white/[0.01] border border-white/5 rounded-xl">
+                                <span className="block text-[8px] text-gray-500 uppercase font-bold">Horizon</span>
+                                <span className="text-white font-extrabold">{play.executive_summary.horizon}</span>
+                              </div>
+                              <div className="p-2 bg-white/[0.01] border border-white/5 rounded-xl">
+                                <span className="block text-[8px] text-gray-500 uppercase font-bold">Expected CAGR</span>
+                                <span className="text-brand-400 font-extrabold">{play.executive_summary.cagr}%</span>
+                              </div>
+                              <div className="p-2 bg-white/[0.01] border border-white/5 rounded-xl">
+                                <span className="block text-[8px] text-gray-500 uppercase font-bold">Margin of Safety</span>
+                                <span className="text-white font-extrabold">{play.executive_summary.margin_of_safety}</span>
+                              </div>
+                              <div className="p-2 bg-white/[0.01] border border-white/5 rounded-xl">
+                                <span className="block text-[8px] text-gray-500 uppercase font-bold">Style</span>
+                                <span className="text-white font-extrabold text-[9px] truncate block">{play.executive_summary.style}</span>
+                              </div>
+                              <div className="p-2 bg-white/[0.01] border border-white/5 rounded-xl">
+                                <span className="block text-[8px] text-gray-500 uppercase font-bold">Risk Level</span>
+                                <span className={`font-extrabold ${play.executive_summary.risk_level === 'High' ? 'text-red-400' : 'text-brand-400'}`}>{play.executive_summary.risk_level}</span>
+                              </div>
+                            </div>
+
+                            {/* Executive Summary paragraph */}
+                            <div className="p-3 bg-brand-500/[0.02] border border-brand-500/10 rounded-xl space-y-1">
+                              <span className="text-[9px] uppercase font-bold text-gray-500 font-mono">Executive Summary</span>
+                              <p className="text-xs text-gray-200 leading-normal font-sans">{play.executive_summary.summary_text}</p>
+                            </div>
+
+                            {/* sell side research note snippet */}
+                            <div className="p-3 bg-black/40 border border-white/5 rounded-xl space-y-1">
+                              <span className="text-[9px] uppercase font-bold text-gray-500 font-mono">Sell-Side Research Note</span>
+                              <p className="text-[11px] text-gray-400 leading-normal italic font-sans">{play.research_note?.summary}</p>
+                            </div>
                           </div>
                         )}
 
-                        {/* Audit Parameters Badges Checklist */}
-                        <div className="grid grid-cols-3 gap-2 text-[10px] text-center font-mono">
-                          <div className="p-2 rounded-xl bg-white/[0.01] border border-white/5 text-brand-400">
-                            <span className="block text-[8px] uppercase text-gray-500 font-bold">ROCE Check</span>
-                            <span className="font-bold">PASS ✓</span>
-                          </div>
-                          <div className="p-2 rounded-xl bg-white/[0.01] border border-white/5 text-brand-400">
-                            <span className="block text-[8px] uppercase text-gray-500 font-bold">P/E Check</span>
-                            <span className="font-bold">PASS ✓</span>
-                          </div>
-                          <div className="p-2 rounded-xl bg-white/[0.01] border border-white/5 text-brand-400">
-                            <span className="block text-[8px] uppercase text-gray-500 font-bold">Debt Check</span>
-                            <span className="font-bold">PASS ✓</span>
-                          </div>
-                        </div>
+                        {/* Tab Content: Pillars */}
+                        {activeSubTab === 'pillars' && play.why_we_own && (
+                          <div className="space-y-4 animate-slide-up text-xs">
+                            {/* Why We Own */}
+                            <div className="space-y-2">
+                              <span className="text-[9px] uppercase font-bold text-gray-500 font-mono block">Why We Own This Company</span>
+                              <ul className="space-y-1.5 pl-3 list-disc text-gray-300 font-sans">
+                                {play.why_we_own.map((item: string, idx: number) => (
+                                  <li key={idx} className="leading-normal">{item}</li>
+                                ))}
+                              </ul>
+                            </div>
 
-                        {/* Playbook Targets */}
-                        <div className="grid grid-cols-2 gap-3 font-mono text-[10px] bg-white/[0.01] p-3.5 rounded-xl border border-white/5">
-                          <div>Buy Accumulation: <span className="text-brand-400 block font-bold mt-0.5">{play.accumulation_zone}</span></div>
-                          <div>Target Sell: <span className="text-white block font-bold mt-0.5">₹{play.target_price}</span></div>
-                          <div className="col-span-2 border-t border-white/5 pt-2 mt-1">
-                            <div>Primary Catalysts: <span className="text-gray-400 block font-sans mt-0.5 text-[9px] leading-normal">{play.catalysts}</span></div>
-                          </div>
-                        </div>
-
-                        {/* Journey Timeline */}
-                        <div className="space-y-3">
-                          <span className="text-[9px] uppercase font-bold text-gray-500 block">Investment Timeline Journey</span>
-                          <div className="space-y-3 pl-3 border-l border-white/10 font-mono text-[10px]">
-                            {fullTimeline.map((evt: any, tIdx: number) => (
-                              <div key={tIdx} className="relative text-left">
-                                <div className={`absolute -left-[16px] top-1.5 w-1.5 h-1.5 rounded-full ${
-                                  evt.event === "Journal Entry" ? "bg-amber-400" : "bg-brand-500"
-                                }`} />
-                                <span className="text-white font-bold block">{evt.event}</span>
-                                <span className="text-gray-500 block text-[9px] mt-0.5 font-sans leading-normal">{evt.detail}</span>
+                            {/* Pillars */}
+                            <div className="space-y-2 border-t border-white/5 pt-3">
+                              <span className="text-[9px] uppercase font-bold text-gray-500 font-mono block">Core Investment Pillars</span>
+                              <div className="grid grid-cols-1 gap-1.5">
+                                {play.pillars.map((item: string, idx: number) => (
+                                  <div key={idx} className="p-2 bg-white/[0.01] border border-white/5 rounded-lg flex items-start gap-2">
+                                    <span className="text-brand-400 font-bold font-mono">0{idx+1}.</span>
+                                    <span className="text-gray-200 font-sans">{item}</span>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        </div>
+                            </div>
 
-                        {/* Interactive Journal Observation Form */}
-                        <div className="pt-3 border-t border-white/5 space-y-2">
-                          <span className="text-[8px] uppercase font-bold text-gray-500 block font-mono">Add Journal Observation</span>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              placeholder="Enter earnings result, news event, or broker upgrades..."
-                              value={activeNoteText[play.ticker] || ''}
-                              onChange={(e) => setActiveNoteText(prev => ({ ...prev, [play.ticker]: e.target.value }))}
-                              className="bg-black/60 border border-white/5 px-3 py-1.5 rounded-xl text-xs flex-1 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500/30 transition-colors font-sans"
-                            />
-                            <button
-                              onClick={() => addJournalEntry(play.ticker)}
-                              className="bg-brand-500 hover:bg-brand-600 px-3 py-1.5 rounded-xl text-[10px] font-bold text-white uppercase transition-colors shrink-0"
-                            >
-                              Save Note
-                            </button>
+                            {/* Why This Stock / Peer Compare */}
+                            <div className="p-3 bg-blue-500/[0.02] border border-blue-500/10 rounded-xl space-y-1">
+                              <span className="text-[9px] uppercase font-bold text-gray-500 font-mono block">Why This Stock? (vs. Peers)</span>
+                              <p className="text-gray-300 leading-normal font-sans">{play.why_this_stock}</p>
+                            </div>
                           </div>
-                        </div>
+                        )}
+
+                        {/* Tab Content: Scorecard */}
+                        {activeSubTab === 'scorecard' && play.scorecard && (
+                          <div className="space-y-3 animate-slide-up text-xs">
+                            <span className="text-[9px] uppercase font-bold text-gray-500 font-mono block">11-Point Fundamental Checklist</span>
+                            <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1 no-scrollbar">
+                              {Object.entries(play.scorecard).map(([metric, val]: any, idx: number) => {
+                                const isImp = val.status === "Improving"
+                                const isWeak = val.status === "Weakening"
+                                return (
+                                  <div key={idx} className="p-2.5 bg-white/[0.01] border border-white/5 rounded-xl flex items-start justify-between gap-4">
+                                    <div>
+                                      <span className="font-bold text-white block">{metric}</span>
+                                      <span className="text-[10px] text-gray-400 block mt-0.5 leading-normal">{val.explanation}</span>
+                                    </div>
+                                    <span className={`text-[8px] font-black font-mono px-2 py-0.5 rounded shrink-0 uppercase border ${
+                                      isImp ? 'bg-brand-500/10 text-brand-400 border-brand-500/20' :
+                                      isWeak ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                      'bg-gray-500/10 text-gray-400 border-white/5'
+                                    }`}>{val.status}</span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Tab Content: Playbook zones */}
+                        {activeSubTab === 'playbook' && play.zones && (
+                          <div className="space-y-4 animate-slide-up text-xs">
+                            {/* Buy/Sell Playbook Zones */}
+                            <div className="space-y-2">
+                              <span className="text-[9px] uppercase font-bold text-gray-500 font-mono block">Investment Playbook Zones</span>
+                              <div className="grid grid-cols-2 gap-2 font-mono text-[10px]">
+                                <div className="p-2 bg-white/[0.01] border border-white/5 rounded-lg">
+                                  <span className="text-gray-500 block">Ideal Entry:</span>
+                                  <span className="text-brand-400 font-bold block mt-0.5">{play.zones.ideal_entry}</span>
+                                </div>
+                                <div className="p-2 bg-white/[0.01] border border-white/5 rounded-lg">
+                                  <span className="text-gray-500 block">Aggressive Entry:</span>
+                                  <span className="text-white font-bold block mt-0.5">{play.zones.aggressive_entry}</span>
+                                </div>
+                                <div className="p-2 bg-white/[0.01] border border-white/5 rounded-lg">
+                                  <span className="text-gray-500 block">Accumulation Zone:</span>
+                                  <span className="text-brand-400 font-bold block mt-0.5">{play.zones.accumulation_zone}</span>
+                                </div>
+                                <div className="p-2 bg-white/[0.01] border border-white/5 rounded-lg">
+                                  <span className="text-gray-500 block">Reduce Zone:</span>
+                                  <span className="text-amber-400 font-bold block mt-0.5">{play.zones.reduce_zone}</span>
+                                </div>
+                                <div className="p-2 bg-white/[0.01] border border-white/5 rounded-lg">
+                                  <span className="text-gray-500 block">Profit Booking:</span>
+                                  <span className="text-amber-400 font-bold block mt-0.5">{play.zones.profit_booking_zone}</span>
+                                </div>
+                                <div className="p-2 bg-white/[0.01] border border-white/5 rounded-lg">
+                                  <span className="text-gray-500 block">Final Exit Zone:</span>
+                                  <span className="text-red-400 font-bold block mt-0.5">{play.zones.final_exit_zone}</span>
+                                </div>
+                                <div className="p-2 bg-white/[0.01] border border-white/5 rounded-lg">
+                                  <span className="text-gray-500 block">Trailing Stop:</span>
+                                  <span className="text-red-400 font-bold block mt-0.5">{play.zones.trailing_stop}</span>
+                                </div>
+                                <div className="p-2 bg-white/[0.01] border border-white/5 rounded-lg">
+                                  <span className="text-gray-500 block">Invalidation Level:</span>
+                                  <span className="text-red-400 font-bold block mt-0.5">{play.zones.invalidation_level}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Scenarios matrix */}
+                            {play.scenarios && (
+                              <div className="space-y-2 border-t border-white/5 pt-3">
+                                <span className="text-[9px] uppercase font-bold text-gray-500 font-mono block">Expected Valuation Scenarios</span>
+                                <div className="overflow-x-auto no-scrollbar">
+                                  <table className="w-full text-left text-[9px] border-collapse font-mono">
+                                    <thead>
+                                      <tr className="border-b border-white/5 text-gray-500 uppercase">
+                                        <th className="py-1">Case</th>
+                                        <th className="py-1 text-right">CAGR</th>
+                                        <th className="py-1 text-right">Target</th>
+                                        <th className="py-1 text-right">Prob</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      <tr className="border-b border-white/[0.02] text-brand-400">
+                                        <td className="py-1.5 font-bold">Bull Case</td>
+                                        <td className="py-1.5 text-right">{play.scenarios.bull.cagr}%</td>
+                                        <td className="py-1.5 text-right">{play.scenarios.bull.price}</td>
+                                        <td className="py-1.5 text-right font-bold">{play.scenarios.bull.probability}%</td>
+                                      </tr>
+                                      <tr className="border-b border-white/[0.02] text-white">
+                                        <td className="py-1.5 font-bold">Base Case</td>
+                                        <td className="py-1.5 text-right">{play.scenarios.base.cagr}%</td>
+                                        <td className="py-1.5 text-right">{play.scenarios.base.price}</td>
+                                        <td className="py-1.5 text-right font-bold">{play.scenarios.base.probability}%</td>
+                                      </tr>
+                                      <tr className="border-b border-white/[0.02] text-red-400">
+                                        <td className="py-1.5 font-bold">Bear Case</td>
+                                        <td className="py-1.5 text-right">{play.scenarios.bear.cagr}%</td>
+                                        <td className="py-1.5 text-right">{play.scenarios.bear.price}</td>
+                                        <td className="py-1.5 text-right font-bold">{play.scenarios.bear.probability}%</td>
+                                      </tr>
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Tab Content: Journal log timeline & breakers */}
+                        {activeSubTab === 'journal' && (
+                          <div className="space-y-4 animate-slide-up text-xs">
+                            {/* Thesis Breakers */}
+                            {play.breakers && (
+                              <div className="space-y-2">
+                                <span className="text-[9px] uppercase font-bold text-gray-500 font-mono block">Key Thesis Breakers</span>
+                                <div className="space-y-1.5">
+                                  {play.breakers.map((item: any, bIdx: number) => (
+                                    <div key={bIdx} className="p-2.5 bg-red-500/[0.02] border border-red-500/10 rounded-xl flex items-center justify-between text-[10px]">
+                                      <div>
+                                        <span className="text-white font-bold block">{item.risk}</span>
+                                        <span className="text-gray-500 block mt-0.5">Impact: {item.impact}</span>
+                                      </div>
+                                      <span className="text-red-400 font-bold shrink-0 font-mono">Prob: {item.probability}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Investment timeline */}
+                            <div className="space-y-2 border-t border-white/5 pt-3">
+                              <span className="text-[9px] uppercase font-bold text-gray-500 block font-mono">Investment Timeline Journey</span>
+                              <div className="space-y-3 pl-3 border-l border-white/10 font-mono text-[10px]">
+                                {fullTimeline.map((evt: any, tIdx: number) => {
+                                  const isJournal = evt.event === "Journal Entry"
+                                  const isEarnings = evt.event?.includes("Earnings") || evt.detail?.includes("Earnings")
+                                  return (
+                                    <div key={tIdx} className="relative text-left">
+                                      <div className={`absolute -left-[16px] top-1.5 w-1.5 h-1.5 rounded-full ${
+                                        isJournal ? "bg-amber-400" : isEarnings ? "bg-blue-400" : "bg-brand-500"
+                                      }`} />
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-white font-bold">{evt.event}</span>
+                                        {isJournal && <span className="text-[8px] uppercase bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1 py-0.2 rounded font-black font-mono">Note</span>}
+                                      </div>
+                                      <span className="text-gray-500 block text-[9px] mt-0.5 font-sans leading-normal">{evt.detail}</span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Observation Logger with Tags options */}
+                            <div className="pt-3 border-t border-white/5 space-y-2">
+                              <span className="text-[8px] uppercase font-bold text-gray-500 block font-mono">Log Investment Event (Journal 2.0)</span>
+                              
+                              {/* tag selector buttons */}
+                              <div className="flex flex-wrap gap-1">
+                                {["Earnings", "Management", "News", "Results", "Order Win", "Government Policy", "Valuation", "Technical"].map(tag => (
+                                  <button
+                                    key={tag}
+                                    onClick={() => {
+                                      setActiveNoteText(prev => {
+                                        const current = prev[play.ticker] || ''
+                                        if (current.startsWith(`[${tag}] `)) return prev
+                                        return { ...prev, [play.ticker]: `[${tag}] ${current}` }
+                                      })
+                                    }}
+                                    className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-white/5 text-gray-400 hover:text-white border border-white/5"
+                                  >
+                                    +{tag}
+                                  </button>
+                                ))}
+                              </div>
+
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="Enter results details, management updates, or news..."
+                                  value={activeNoteText[play.ticker] || ''}
+                                  onChange={(e) => setActiveNoteText(prev => ({ ...prev, [play.ticker]: e.target.value }))}
+                                  className="bg-black/60 border border-white/5 px-3 py-1.5 rounded-xl text-xs flex-1 text-white placeholder-gray-600 focus:outline-none focus:border-brand-500/30 transition-colors font-sans"
+                                />
+                                <button
+                                  onClick={() => addJournalEntry(play.ticker)}
+                                  className="bg-brand-500 hover:bg-brand-600 px-3 py-1.5 rounded-xl text-[10px] font-bold text-white uppercase transition-colors shrink-0"
+                                >
+                                  Save Note
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
                       </div>
                     )

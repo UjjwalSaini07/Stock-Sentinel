@@ -344,7 +344,7 @@ async def get_decision_layer(user=Depends(get_current_user)):
     if watchlist_doc and "watchlist" in watchlist_doc:
         watchlist = watchlist_doc["watchlist"]
         
-    decision_data = generate_portfolio_decision_layer(portfolio, watchlist, "wealth")
+    decision_data = await generate_portfolio_decision_layer(portfolio, watchlist, "wealth")
     return decision_data
 
 
