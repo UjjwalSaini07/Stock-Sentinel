@@ -76,6 +76,7 @@ export const stockApi = {
   getScanEarlyOpportunity: () => api.get('/stock/scan/early-opportunity'),
   getScanTurnaround: () => api.get('/stock/scan/turnaround'),
   rankWatchlist: (tickers: string[]) => api.post('/stock/watchlist/rank', { tickers }),
+  deleteStock: (ticker: string) => api.delete(`/stock/${ticker}`),
 }
 
 // Alerts

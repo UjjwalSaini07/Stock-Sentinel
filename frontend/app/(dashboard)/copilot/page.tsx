@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { copilotApi } from '@/lib/api'
 import toast from 'react-hot-toast'
+import ConfirmModal from '@/components/ui/ConfirmModal'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -68,6 +69,10 @@ export default function CopilotPage() {
   const [chatLoading, setChatLoading] = useState(false)
   const [sessionsLoading, setSessionsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Confirmation Modal states
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [sessionIdToDelete, setSessionIdToDelete] = useState<string | null>(null)
 
   // ── Portfolio Intelligence State ───────────────────────────
   const [portfolioIntel, setPortfolioIntel] = useState<any>(null)
@@ -152,17 +157,37 @@ export default function CopilotPage() {
     }
   }
 
-  async function deleteSession(id: string, e: React.MouseEvent) {
+  function deleteSession(id: string, e: React.MouseEvent) {
     e.stopPropagation()
-    if (!confirm('Are you sure you want to delete this chat session?')) return
+    setSessionIdToDelete(id)
+    setDeleteConfirmOpen(true)
+  }
+
+  async function executeDeleteSession() {
+    if (!sessionIdToDelete) return
+    const id = sessionIdToDelete
+    setDeleteConfirmOpen(false)
+    setSessionIdToDelete(null)
+    
+    const previousSessions = [...sessions]
+    
+    // Optimistic UI Update
+    setSessions(prev => prev.filter(s => s.id !== id))
+    if (activeSessionId === id) {
+      setActiveSessionId(null)
+      setMessages([])
+    }
+    
     try {
       await copilotApi.deleteSession(id)
-      setSessions(prev => prev.filter(s => s.id !== id))
-      if (activeSessionId === id) {
-        setActiveSessionId(null)
-      }
       toast.success('Chat deleted')
     } catch {
+      // Rollback
+      setSessions(previousSessions)
+      if (activeSessionId === id) {
+        setActiveSessionId(id)
+        loadSessionMessages(id)
+      }
       toast.error('Failed to delete session')
     }
   }
@@ -1033,6 +1058,21 @@ export default function CopilotPage() {
         )}
 
       </div>
+
+      {/* CONFIRM DELETE MODAL */}
+      <ConfirmModal
+        isOpen={deleteConfirmOpen}
+        title="Delete Chat Session"
+        message="Are you sure you want to delete this chat session? This will erase all message history in this conversation."
+        confirmText="Delete"
+        cancelText="Keep Chat"
+        type="danger"
+        onConfirm={executeDeleteSession}
+        onCancel={() => {
+          setDeleteConfirmOpen(false)
+          setSessionIdToDelete(null)
+        }}
+      />
     </div>
   )
 }
