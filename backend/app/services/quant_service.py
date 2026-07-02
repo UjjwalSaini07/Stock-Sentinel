@@ -171,7 +171,7 @@ async def fetch_historical_prices(ticker: str, range_str: str = "1y") -> Optiona
     ticker = ticker.strip().upper()
     cache_key = f"quant:hist:{ticker}:{range_str}"
     
-    cached = await redis.get(cache_key)
+    cached = await redis.get(cache_key) if redis else None
     if cached:
         return json.loads(cached)
         
@@ -247,7 +247,8 @@ async def fetch_historical_prices(ticker: str, range_str: str = "1y") -> Optiona
                                 "low": cleaned_lows
                             }
                             # Cache the result under the original searched ticker
-                            await redis.setex(cache_key, 7200, json.dumps(res))
+                            if redis:
+                                await redis.setex(cache_key, 7200, json.dumps(res))
                             return res
         except Exception as e:
             print(f"[QuantService] Historical fetch error for {symbol}: {e}")

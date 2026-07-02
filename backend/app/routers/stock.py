@@ -5,10 +5,52 @@ from datetime import datetime, timezone
 
 router = APIRouter()
 
+from pydantic import BaseModel
+from typing import List
+
+class RankWatchlistBody(BaseModel):
+    tickers: List[str]
+
 @router.get("/search")
 async def search(q: str = Query(min_length=1)):
     results = await search_tickers(q)
     return results
+
+@router.get("/scan/multibagger")
+async def get_scan_multibagger():
+    from app.services.decision_intelligence import scan_multibagger_stocks
+    try:
+        data = await scan_multibagger_stocks()
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/scan/early-opportunity")
+async def get_scan_early_opportunity():
+    from app.services.decision_intelligence import scan_early_opportunities
+    try:
+        data = await scan_early_opportunities()
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.get("/scan/turnaround")
+async def get_scan_turnaround():
+    from app.services.decision_intelligence import scan_turnarounds
+    try:
+        data = await scan_turnarounds()
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/watchlist/rank")
+async def rank_watchlist(body: RankWatchlistBody):
+    from app.services.decision_intelligence import rank_watchlist_stocks
+    try:
+        data = await rank_watchlist_stocks(body.tickers)
+        return data
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/{ticker}")
 async def get_stock(ticker: str):
@@ -354,6 +396,16 @@ async def get_intrinsic_value(ticker: str):
             "timestamp": data["timestamp"],
             "raw_data": data["intrinsic_value"]
         }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{ticker}/decision-intelligence")
+async def get_decision_intelligence(ticker: str):
+    from app.services.decision_intelligence import compute_decision_intelligence
+    try:
+        data = await compute_decision_intelligence(ticker.upper())
+        return data
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
