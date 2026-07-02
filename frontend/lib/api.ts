@@ -99,6 +99,10 @@ export const copilotApi = {
   getEarnings: (ticker: string) => api.get(`/copilot/earnings/${ticker}`),
   getRecommendations: () => api.get('/copilot/recommendations'),
   getPortfolioAiInsights: () => api.get('/copilot/portfolio/ai-insights'),
+  getPortfolioV2: (goal?: string) => api.get('/copilot/portfolio-v2', { params: { goal } }),
+  getDecisionLayer: () => api.get('/copilot/portfolio/decision-layer'),
+  getMarketIntelligence: () => api.get('/copilot/portfolio/market-intelligence'),
+  simulateWealth: (payload: any) => api.post('/copilot/portfolio/wealth-planner', payload),
   getInvestAssistant: (ticker: string) => api.get(`/copilot/invest-assistant/${ticker}`),
 }
 

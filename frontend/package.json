@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "clean-dev": "powershell -Command \"Remove-Item -Recurse -Force -ErrorAction SilentlyContinue .next\" && next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
