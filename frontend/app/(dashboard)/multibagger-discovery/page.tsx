@@ -411,41 +411,56 @@ export default function MultibaggerDiscoveryPage() {
             const inWatchlist = user?.watchlist?.includes(item.ticker.toUpperCase())
             const isExpanded = expandedTicker === item.ticker
             
-            // Score Factor break down estimations
+            // Score Factor breakdown calculations
             const capFactor = item.multibagger_score >= 70 ? 25 : item.multibagger_score >= 55 ? 15 : 5
             const growthFactor = item.multibagger_score >= 55 ? 30 : 15
             const qualityFactor = item.alpha_score >= 70 ? 25 : 12
             const debtFactor = item.multibagger_score >= 60 ? 20 : 12
 
+            // Circular progress calculations for the SVG circle ring
+            const radius = 19
+            const circumference = 2 * Math.PI * radius
+            const strokeDashoffset = circumference - (item.multibagger_score / 100) * circumference
+
             return (
               <div 
                 key={item.ticker} 
-                className="p-5 rounded-2xl bg-surface-card/65 backdrop-blur-md border border-white/5 hover:border-brand-500/20 hover:bg-white/[0.01] transition-all group relative overflow-hidden flex flex-col justify-between"
+                className={`p-5 rounded-2xl backdrop-blur-md transition-all duration-300 group relative overflow-hidden flex flex-col justify-between hover:-translate-y-0.5 active:scale-[0.99] ${
+                  index === 0 ? 'border border-amber-500/35 bg-gradient-to-br from-amber-500/[0.02] via-slate-950/95 to-slate-900/30 shadow-[0_0_35px_rgba(245,158,11,0.05)]' :
+                  index === 1 ? 'border border-slate-400/35 bg-gradient-to-br from-slate-400/[0.02] via-slate-950/95 to-slate-900/30 shadow-[0_0_35px_rgba(203,213,225,0.05)]' :
+                  index === 2 ? 'border border-amber-700/35 bg-gradient-to-br from-amber-700/[0.02] via-slate-950/95 to-slate-900/30 shadow-[0_0_35px_rgba(180,83,9,0.05)]' :
+                  'border border-white/5 bg-slate-950/65 hover:border-brand-500/20 hover:bg-slate-950/80 shadow-md'
+                }`}
               >
                 {/* Glow Overlay */}
-                <div className="absolute top-0 right-0 w-[140px] h-[140px] bg-brand-500/[0.02] group-hover:bg-brand-500/[0.04] blur-[55px] pointer-events-none rounded-full transition-all" />
+                <div className={`absolute top-0 right-0 w-[130px] h-[130px] blur-[55px] pointer-events-none rounded-full transition-all duration-300 ${
+                  index === 0 ? 'bg-amber-500/[0.03] group-hover:bg-amber-500/[0.07]' :
+                  index === 1 ? 'bg-slate-400/[0.03] group-hover:bg-slate-400/[0.07]' :
+                  index === 2 ? 'bg-amber-700/[0.03] group-hover:bg-amber-700/[0.07]' :
+                  'bg-brand-500/[0.01] group-hover:bg-brand-500/[0.05]'
+                }`} />
                 
                 <div>
                   {/* Top Metadata row */}
                   <div className="flex items-start justify-between border-b border-white/5 pb-4 mb-4">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className={`text-[10px] font-bold font-mono px-2 py-0.5 rounded border ${
-                          index === 0 ? 'bg-amber-500/10 text-amber-400 border-amber-500/30' :
-                          index === 1 ? 'bg-gray-300/10 text-gray-300 border-gray-300/30' :
-                          index === 2 ? 'bg-amber-750/10 text-amber-700 border-amber-750/30' :
-                          'bg-brand-500/10 text-brand-400 border-brand-500/20'
+                        <span className={`text-[9px] font-extrabold font-sans tracking-wider px-2.5 py-0.5 rounded border uppercase ${
+                          index === 0 ? 'bg-amber-500/10 text-amber-400 border-amber-500/25 shadow-[0_0_10px_rgba(245,158,11,0.08)]' :
+                          index === 1 ? 'bg-slate-400/10 text-slate-300 border-slate-400/25 shadow-[0_0_10px_rgba(203,213,225,0.08)]' :
+                          index === 2 ? 'bg-amber-750/10 text-amber-600 border-amber-750/25 shadow-[0_0_10px_rgba(180,83,9,0.08)]' :
+                          'bg-brand-500/10 text-brand-400 border-brand-500/15'
                         }`}>
-                          {index === 0 ? '🏆 GOLD' : index === 1 ? '🥈 SILVER' : index === 2 ? '🥉 BRONZE' : `RANK #${index + 1}`}
+                          {index === 0 ? '🏆 GOLD RUNNER' : index === 1 ? '🥈 SILVER MATCH' : index === 2 ? '🥉 BRONZE PEER' : `RANK #${index + 1}`}
                         </span>
-                        <span className="text-[10px] text-gray-500 font-mono">
+                        <span className="text-[10px] text-gray-500 font-semibold font-mono">
                           CAGR Proj: {item.cagr}%
                         </span>
                       </div>
-                      <h3 className="text-lg font-black text-white tracking-tight mt-1.5 flex items-center gap-2">
+                      <h3 className="text-lg font-black text-white tracking-tight mt-2 flex items-center gap-2">
                         {item.company_name}
                         <Link href={`/stock/${item.ticker}`} className="text-gray-500 hover:text-brand-400 transition-colors">
-                          <ExternalLink size={14} />
+                          <ExternalLink size={13} />
                         </Link>
                       </h3>
                       <p className="text-xs text-gray-400 font-mono mt-0.5">
@@ -453,37 +468,67 @@ export default function MultibaggerDiscoveryPage() {
                       </p>
                     </div>
 
-                    <div className="flex items-start gap-2">
-                      <div className="text-right">
-                        <div className="text-[9px] text-gray-500 uppercase font-semibold">Multibagger score</div>
-                        <div className="text-2xl font-black text-brand-400 font-mono mt-0.5">
-                          {item.multibagger_score}%
+                    <div className="flex items-center gap-3">
+                      {/* Premium Telemetry Circular Progress Ring */}
+                      <div className="text-right flex items-center gap-2.5">
+                        <div className="hidden sm:block">
+                          <div className="text-[9px] text-gray-500 uppercase font-semibold">Multibagger</div>
+                          <div className="text-[9px] text-gray-400 font-mono mt-0.5">
+                            Alpha: {item.alpha_score}/100
+                          </div>
                         </div>
-                        <div className="text-[9px] text-gray-500 font-mono mt-0.5">
-                          Alpha Score: {item.alpha_score}/100
+                        <div className="relative w-12 h-12 shrink-0 flex items-center justify-center">
+                          <svg className="w-full h-full transform -rotate-90">
+                            <circle
+                              cx="24"
+                              cy="24"
+                              r="19"
+                              className="stroke-white/[0.04]"
+                              strokeWidth="3"
+                              fill="transparent"
+                            />
+                            <circle
+                              cx="24"
+                              cy="24"
+                              r="19"
+                              className={
+                                index === 0 ? "stroke-amber-500" :
+                                index === 1 ? "stroke-slate-300" :
+                                index === 2 ? "stroke-amber-700" :
+                                "stroke-brand-500"
+                              }
+                              strokeWidth="3"
+                              fill="transparent"
+                              strokeDasharray={circumference}
+                              strokeDashoffset={strokeDashoffset}
+                              strokeLinecap="round"
+                              style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+                            />
+                          </svg>
+                          <span className="absolute text-[10px] font-black text-white font-mono">{item.multibagger_score}%</span>
                         </div>
                       </div>
 
-                      <div className="flex flex-col gap-1.5 shrink-0">
+                      <div className="flex flex-col gap-1 shrink-0">
                         {/* Watchlist toggle btn */}
                         <button
                           onClick={(e) => toggleWatchlist(item.ticker, e)}
-                          className={`p-1.5 rounded-lg border transition-all active:scale-95 ${
+                          className={`p-1.5 rounded-lg border transition-all active:scale-90 ${
                             inWatchlist 
-                              ? 'bg-brand-500/10 border-brand-500/25 text-brand-400' 
-                              : 'bg-white/5 border-white/10 text-gray-400 hover:text-white'
+                              ? 'bg-brand-500/10 border-brand-500/25 text-brand-400 shadow-[0_0_10px_rgba(38,163,102,0.06)]' 
+                              : 'bg-white/5 border-white/10 text-gray-400 hover:text-white hover:bg-white/[0.02]'
                           }`}
                           title={inWatchlist ? "Remove from Watchlist" : "Add to Watchlist"}
                         >
-                          {inWatchlist ? <Check size={13} /> : <Plus size={13} />}
+                          {inWatchlist ? <Check size={12} /> : <Plus size={12} />}
                         </button>
                         {/* Delete btn */}
                         <button
                           onClick={(e) => handleDeleteStock(item.ticker, e)}
-                          className="p-1.5 rounded-lg border bg-red-500/5 border-red-500/15 text-red-400 hover:bg-red-500/20 hover:border-red-500/30 transition-all active:scale-95"
+                          className="p-1.5 rounded-lg border bg-red-500/5 border-red-500/15 text-red-400 hover:bg-red-500/20 hover:border-red-500/30 transition-all active:scale-90"
                           title="Delete from Platform completely"
                         >
-                          <Trash2 size={13} />
+                          <Trash2 size={12} />
                         </button>
                       </div>
                     </div>
@@ -500,7 +545,7 @@ export default function MultibaggerDiscoveryPage() {
                         <Info size={10} /> Inspect Formula
                       </button>
                     </div>
-                    <div className="grid grid-cols-4 gap-2 text-[9px] font-mono text-gray-400">
+                    <div className="grid grid-cols-4 gap-2.5 text-[9px] font-mono text-gray-400">
                       <div className="space-y-1">
                         <div className="flex justify-between"><span>Size</span><span>{capFactor}/25</span></div>
                         <div className="w-full h-1 bg-white/[0.04] rounded-full overflow-hidden">
@@ -698,56 +743,71 @@ export default function MultibaggerDiscoveryPage() {
 
       {/* INSPECTOR MODAL */}
       {inspectItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-white/10 p-6 rounded-2xl w-full max-w-lg space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-start">
-              <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Info size={16} className="text-brand-400" /> Multibagger Formula Inspector
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-fade-in">
+          {/* Main Black Glassmorphism Panel */}
+          <div className="relative overflow-hidden bg-black/80 backdrop-blur-2xl border border-white/[0.08] p-6 rounded-2xl w-full max-w-lg space-y-5 max-h-[90vh] overflow-y-auto shadow-[0_0_50px_rgba(0,0,0,0.85)] text-gray-200 animate-scale-in">
+            {/* Ambient background glow */}
+            <div className="absolute -top-20 -left-20 w-64 h-64 bg-brand-500/[0.03] blur-[60px] pointer-events-none rounded-full" />
+            
+            <div className="flex justify-between items-center border-b border-white/5 pb-3 z-10 relative">
+              <h3 className="text-sm font-black text-white tracking-tight uppercase flex items-center gap-2">
+                <Info size={15} className="text-brand-400" /> Multibagger Formula Inspector
               </h3>
               <button 
                 onClick={() => setInspectItem(null)}
-                className="text-gray-500 hover:text-white transition-colors font-mono text-base font-bold"
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-white/[0.02] border border-white/5 hover:bg-white/[0.08] text-gray-400 hover:text-white transition-all text-xs font-bold"
               >
                 ✕
               </button>
             </div>
 
-            <div className="space-y-3.5 text-xs leading-normal">
-              <div>
-                <span className="text-gray-500 font-bold uppercase tracking-wider text-[9px]">Mathematical Formula</span>
-                <div className="bg-white/5 p-3 rounded-lg font-mono text-white mt-1 border border-white/5 text-[11px]">
+            <div className="space-y-4 text-xs leading-normal z-10 relative">
+              <div className="space-y-1.5">
+                <span className="text-gray-500 font-bold uppercase tracking-wider text-[9px] block">Mathematical Formula</span>
+                {/* Glassmorphic Inner Card */}
+                <div className="bg-black/40 backdrop-blur-sm border border-white/[0.05] p-3.5 rounded-xl font-mono text-brand-400 font-extrabold text-[10px] leading-relaxed">
                   Score = Size_Score (25%) + Growth_Score (30%) + Efficiency_Score (25%) + Debt_Score (20%)
                 </div>
               </div>
 
-              <div>
-                <span className="text-gray-500 font-bold uppercase tracking-wider text-[9px]">Inputs evaluated for {inspectItem.company_name}</span>
-                <div className="bg-black/40 border border-white/5 p-3 rounded-lg space-y-2 mt-1 font-mono text-[11px]">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500 font-sans">Market Cap Size</span>
-                    <span className="text-white font-bold">{inspectItem.multibagger_score >= 70 ? 'Micro-cap' : inspectItem.multibagger_score >= 55 ? 'Small-cap' : 'Large/Mid-cap'}</span>
+              <div className="space-y-1.5">
+                <span className="text-gray-500 font-bold uppercase tracking-wider text-[9px] block">Inputs evaluated for {inspectItem.company_name}</span>
+                {/* Glassmorphic Inner Card */}
+                <div className="bg-black/50 backdrop-blur-sm border border-white/[0.05] p-4 rounded-xl space-y-3 font-mono text-[10px]">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-400 font-sans">Market Cap Size</span>
+                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold border uppercase ${
+                      inspectItem.multibagger_score >= 70 ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                      inspectItem.multibagger_score >= 55 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                      'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                    }`}>
+                      {inspectItem.multibagger_score >= 70 ? 'Micro-cap' : inspectItem.multibagger_score >= 55 ? 'Small-cap' : 'Large/Mid-cap'}
+                    </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500 font-sans">Expected CAGR Projection</span>
+                  <div className="flex justify-between items-center border-t border-white/5 pt-2">
+                    <span className="text-gray-400 font-sans">Expected CAGR Projection</span>
                     <span className="text-white font-bold">{inspectItem.cagr}%</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500 font-sans">Alpha Health Rating</span>
-                    <span className="text-white font-bold">{inspectItem.alpha_score}/100</span>
+                  <div className="flex justify-between items-center border-t border-white/5 pt-2">
+                    <span className="text-gray-400 font-sans">Alpha Health Rating</span>
+                    <span className="text-brand-400 font-bold">{inspectItem.alpha_score}/100</span>
                   </div>
                 </div>
               </div>
 
-              <div>
-                <span className="text-gray-500 font-bold uppercase tracking-wider text-[9px]">Mathematical Logic</span>
-                <p className="text-gray-300 mt-1 leading-relaxed leading-normal font-sans">
+              <div className="space-y-1">
+                <span className="text-gray-500 font-bold uppercase tracking-wider text-[9px] block">Mathematical Logic</span>
+                <p className="text-gray-300 leading-relaxed font-sans text-xs">
                   The model favors low leverage and strong cash flow quality under standard compound allocation guidelines. Small caps/Micro caps receive a premium score due to a smaller base size enabling rapid earnings doubling.
                 </p>
               </div>
             </div>
 
-            <div className="border-t border-white/5 pt-3 flex justify-end">
-              <button onClick={() => setInspectItem(null)} className="btn-primary text-xs px-4 py-1.5">
+            <div className="border-t border-white/5 pt-4 flex justify-end z-10 relative">
+              <button 
+                onClick={() => setInspectItem(null)} 
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-gray-300 hover:text-white bg-white/[0.02] hover:bg-white/[0.06] border border-white/10 transition-all duration-150 active:scale-95"
+              >
                 Close
               </button>
             </div>
